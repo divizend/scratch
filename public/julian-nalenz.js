@@ -9,7 +9,7 @@ class DivizendJulianNalenz {
         {
           opcode: "sendEmail",
           blockType: "command",
-          text: "send email [from] [to] [content] [resendApiKey]",
+          text: "send email [from] [to] [subject] [content] [resendApiKey]",
           arguments: {
             from: {
               type: "string",
