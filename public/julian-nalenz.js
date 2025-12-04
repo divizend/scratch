@@ -19,6 +19,10 @@ class DivizendJulianNalenz {
               type: "string",
               defaultValue: "julian.nalenz@divizend.com",
             },
+            subject: {
+              type: "string",
+              defaultValue: "Hello from a Scratch block!",
+            },
             content: {
               type: "string",
               defaultValue: "Hello from a Scratch block!",
@@ -33,18 +37,18 @@ class DivizendJulianNalenz {
     };
   }
 
-  sendEmail({ from, to, content, resendApiKey }) {
-    return fetch("https://api.resend.com/emails", {
+  sendEmail({ from, to, subject, content, resendApiKey }) {
+    return fetch("https://scratch.divizend.ai/api/send-email", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${resendApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `Scratch BPA <${from}>`,
-        to: [to],
-        subject: "Email sent via Scratch",
-        html: `<p>${content}</p>`,
+        from,
+        to,
+        subject,
+        content,
+        resendApiKey,
       }),
     }).then((response) => response.text());
   }
