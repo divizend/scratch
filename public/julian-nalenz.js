@@ -24,7 +24,7 @@ class DivizendJulianNalenz {
               defaultValue: "Hello from a Scratch block!",
             },
             resendApiKey: {
-              type: "secret",
+              type: "string",
               defaultValue: "Resend API key",
             },
           },
