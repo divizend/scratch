@@ -50,4 +50,4 @@ class DivizendJulianNalenz {
   }
 }
 
-Scratch.extensions.register(new Divizend());
+Scratch.extensions.register(new DivizendJulianNalenz());
