@@ -234,14 +234,43 @@ app.get("/admin", async (c) => {
       margin-top: 20px;
     }
     .email-item {
-      padding: 15px;
-      margin: 10px 0;
+      padding: 8px 12px;
+      margin: 4px 0;
       border: 1px solid #ddd;
       border-radius: 4px;
       background: #fafafa;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    .email-item strong { display: block; margin-bottom: 5px; }
-    .email-item small { color: #666; }
+    .email-item input[type="checkbox"] {
+      margin: 0;
+      cursor: pointer;
+    }
+    .email-item-content {
+      flex: 1;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      font-size: 14px;
+    }
+    .email-item-content > span {
+      min-width: 0;
+    }
+    .email-to { font-weight: 500; min-width: 200px; }
+    .email-from { color: #666; min-width: 200px; }
+    .email-subject { flex: 1; }
+    .email-time { color: #999; font-size: 12px; min-width: 150px; }
+    .select-all {
+      margin-bottom: 10px;
+      padding: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    .select-all label {
+      cursor: pointer;
+      font-weight: 500;
+    }
     .status {
       margin: 10px 0;
       padding: 10px;
@@ -340,6 +369,8 @@ app.get("/admin", async (c) => {
       <div class="actions">
         <button onclick="loadQueue()">Refresh Queue</button>
         <button onclick="sendAllEmails()" id="sendBtn">Send All Emails</button>
+        <button onclick="sendSelectedEmails()" id="sendSelectedBtn">Send Selected</button>
+        <button onclick="removeSelectedEmails()" id="removeSelectedBtn">Remove Selected</button>
         <button onclick="clearQueue()" id="clearBtn">Clear Queue</button>
       </div>
 
@@ -417,7 +448,6 @@ app.get("/admin", async (c) => {
 
         const data = await response.json();
         if (data.success) {
-          showStatus('Email added to queue', 'success');
           // Clear form
           document.getElementById('addTo').value = '';
           document.getElementById('addSubject').value = '';
@@ -458,14 +488,35 @@ app.get("/admin", async (c) => {
         list.innerHTML = '<p>No emails in queue</p>';
         return;
       }
-      list.innerHTML = emails.map(email => \`
+      list.innerHTML = \`
+        <div class="select-all">
+          <label>
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+            Select All
+          </label>
+        </div>
+      \` + emails.map(email => \`
         <div class="email-item">
-          <strong>To:</strong> \${email.to}<br>
-          <strong>From:</strong> \${email.from}<br>
-          <strong>Subject:</strong> \${email.subject}<br>
-          <small>Queued: \${new Date(email.queuedAt).toLocaleString()}</small>
+          <input type="checkbox" class="email-checkbox" value="\${email.id}">
+          <div class="email-item-content">
+            <span class="email-to">\${email.to}</span>
+            <span class="email-from">\${email.from}</span>
+            <span class="email-subject">\${email.subject}</span>
+            <span class="email-time">\${new Date(email.queuedAt).toLocaleString()}</span>
+          </div>
         </div>
       \`).join('');
+    }
+
+    function toggleSelectAll() {
+      const selectAll = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('.email-checkbox');
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    }
+
+    function getSelectedEmailIds() {
+      const checkboxes = document.querySelectorAll('.email-checkbox:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
     }
 
     async function sendAllEmails() {
@@ -476,7 +527,11 @@ app.get("/admin", async (c) => {
       try {
         const response = await fetch('/admin/api/queue/send', {
           method: 'POST',
-          headers: { 'Authorization': \`Bearer \${token}\` }
+          headers: { 
+            'Authorization': \`Bearer \${token}\`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ids: null }) // null means send all
         });
         
         if (response.status === 401) {
@@ -493,6 +548,89 @@ app.get("/admin", async (c) => {
         loadQueue();
       } catch (error) {
         showStatus('Failed to send emails: ' + error.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function sendSelectedEmails() {
+      const selectedIds = getSelectedEmailIds();
+      if (selectedIds.length === 0) {
+        showStatus('Please select at least one email', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('sendSelectedBtn');
+      btn.disabled = true;
+      showStatus(\`Sending \${selectedIds.length} email(s)...\`, 'info');
+      
+      try {
+        const response = await fetch('/admin/api/queue/send', {
+          method: 'POST',
+          headers: { 
+            'Authorization': \`Bearer \${token}\`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ids: selectedIds })
+        });
+        
+        if (response.status === 401) {
+          showStatus('Authentication failed', 'error');
+          return;
+        }
+        
+        const data = await response.json();
+        if (data.success) {
+          showStatus(\`Successfully sent \${data.sent} email(s)\`, 'success');
+        } else {
+          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
+        }
+        loadQueue();
+      } catch (error) {
+        showStatus('Failed to send emails: ' + error.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function removeSelectedEmails() {
+      const selectedIds = getSelectedEmailIds();
+      if (selectedIds.length === 0) {
+        showStatus('Please select at least one email', 'error');
+        return;
+      }
+
+      if (!confirm(\`Are you sure you want to remove \${selectedIds.length} email(s) from the queue?\`)) {
+        return;
+      }
+
+      const btn = document.getElementById('removeSelectedBtn');
+      btn.disabled = true;
+      
+      try {
+        const response = await fetch('/admin/api/queue/remove', {
+          method: 'POST',
+          headers: { 
+            'Authorization': \`Bearer \${token}\`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ids: selectedIds })
+        });
+        
+        if (response.status === 401) {
+          showStatus('Authentication failed', 'error');
+          return;
+        }
+        
+        const data = await response.json();
+        if (data.success) {
+          showStatus(\`Removed \${data.removed} email(s)\`, 'success');
+        } else {
+          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
+        }
+        loadQueue();
+      } catch (error) {
+        showStatus('Failed to remove emails: ' + error.message, 'error');
       } finally {
         btn.disabled = false;
       }
@@ -519,7 +657,7 @@ app.get("/admin", async (c) => {
         
         const data = await response.json();
         if (data.success) {
-          showStatus('Queue cleared', 'success');
+          // showStatus('Queue cleared', 'success');
         } else {
           showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
         }
@@ -561,14 +699,20 @@ app.post("/admin/api/queue/clear", jwtAuth, async (c) => {
   return c.json({ success: true, message: "Queue cleared" });
 });
 
-// Admin API: Send all emails
+// Admin API: Send emails (all or selected)
 app.post("/admin/api/queue/send", jwtAuth, async (c) => {
   if (isSending) {
     return c.json({ error: "Email sending already in progress" }, 409);
   }
 
-  if (emailQueue.length === 0) {
-    return c.json({ success: true, sent: 0, message: "Queue is empty" });
+  const { ids } = await c.req.json();
+  const emailsToSend =
+    ids === null
+      ? emailQueue
+      : emailQueue.filter((email) => ids.includes(email.id));
+
+  if (emailsToSend.length === 0) {
+    return c.json({ success: true, sent: 0, message: "No emails to send" });
   }
 
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -584,7 +728,8 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
   let errors = 0;
 
   // Send emails with rate limiting (100ms delay between emails to avoid rate limits)
-  for (const email of emailQueue) {
+  for (let i = 0; i < emailsToSend.length; i++) {
+    const email = emailsToSend[i];
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -602,12 +747,17 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
 
       if (response.ok) {
         sent++;
+        // Remove sent email from queue
+        const index = emailQueue.findIndex((e) => e.id === email.id);
+        if (index !== -1) {
+          emailQueue.splice(index, 1);
+        }
       } else {
         errors++;
       }
 
       // Rate limiting: wait 100ms between emails (allows up to 10 emails/second)
-      if (emailQueue.indexOf(email) < emailQueue.length - 1) {
+      if (i < emailsToSend.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
@@ -615,8 +765,6 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
     }
   }
 
-  // Clear queue after sending
-  emailQueue.length = 0;
   isSending = false;
 
   return c.json({
@@ -624,6 +772,27 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
     sent,
     errors,
     message: `Sent ${sent} email(s)${errors > 0 ? `, ${errors} error(s)` : ""}`,
+  });
+});
+
+// Admin API: Remove selected emails
+app.post("/admin/api/queue/remove", jwtAuth, async (c) => {
+  const { ids } = await c.req.json();
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return c.json({ error: "Invalid or empty ids array" }, 400);
+  }
+
+  const initialLength = emailQueue.length;
+  const filtered = emailQueue.filter((email) => !ids.includes(email.id));
+  emailQueue.length = 0;
+  emailQueue.push(...filtered);
+  const removed = initialLength - emailQueue.length;
+
+  return c.json({
+    success: true,
+    removed,
+    message: `Removed ${removed} email(s)`,
   });
 });
 
