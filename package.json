@@ -1,5 +1,5 @@
 {
-  "name": "scratch-server",
+  "name": "@divizend/scratch",
   "version": "1.0.0",
   "scripts": {
     "dev": "bun run server.ts",
