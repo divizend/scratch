@@ -7,9 +7,9 @@ class DivizendJulianNalenz {
       name: "Divizend (Julian Nalenz)",
       blocks: [
         {
-          opcode: "sendEmail",
+          opcode: "queueEmail",
           blockType: "command",
-          text: "send email [from] [to] [subject] [content]",
+          text: "queue email [from] [to] [subject] [content]",
           arguments: {
             from: {
               type: "string",
@@ -33,7 +33,7 @@ class DivizendJulianNalenz {
     };
   }
 
-  sendEmail({ from, to, subject, content }) {
+  queueEmail({ from, to, subject, content }) {
     return fetch("https://scratch.divizend.ai/api/queue-email", {
       method: "POST",
       headers: {
