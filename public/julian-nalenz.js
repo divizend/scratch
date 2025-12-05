@@ -9,7 +9,7 @@ class DivizendJulianNalenz {
         {
           opcode: "sendEmail",
           blockType: "command",
-          text: "send email [from] [to] [subject] [content] [resendApiKey]",
+          text: "send email [from] [to] [subject] [content]",
           arguments: {
             from: {
               type: "string",
@@ -27,18 +27,14 @@ class DivizendJulianNalenz {
               type: "string",
               defaultValue: "This email was sent from a Scratch block!",
             },
-            resendApiKey: {
-              type: "string",
-              defaultValue: "Resend API key",
-            },
           },
         },
       ],
     };
   }
 
-  sendEmail({ from, to, subject, content, resendApiKey }) {
-    return fetch("https://scratch.divizend.ai/api/send-email", {
+  sendEmail({ from, to, subject, content }) {
+    return fetch("https://scratch.divizend.ai/api/queue-email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -48,7 +44,6 @@ class DivizendJulianNalenz {
         to,
         subject,
         content,
-        resendApiKey,
       }),
     }).then((response) => response.text());
   }
