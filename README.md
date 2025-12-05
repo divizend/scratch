@@ -19,4 +19,5 @@ The web server defined in this repository ([github.com/divizend/scratch](https:/
 5. Run `bun run dev`
 6. Visit http://localhost:3000 and click on "Admin interface"
 7. Enter the token you generated in step 4
-8. 
+8. Visit https://sheeptester.github.io/scratch-gui/?url=https://scratch.divizend.ai/julian-nalenz.js in a separate tab
+9. Choose the "send email" block from the "Divizend (Julian Nalenz)" section and try it
