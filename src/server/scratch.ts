@@ -26,6 +26,12 @@ export interface ScratchEndpoint {
   noAuth?: boolean;
 }
 
+export interface ScratchEndpointDefinition {
+  block: (context: ScratchContext) => Promise<ScratchBlock>;
+  handler: (context: ScratchContext) => Promise<any>;
+  noAuth?: boolean;
+}
+
 // Registry of Scratch endpoints
 export const scratchEndpoints: ScratchEndpoint[] = [];
 
@@ -204,4 +210,14 @@ export async function registerScratchEndpoint(
 
   // Register the route with Hono
   app[method](endpoint, ...middlewares);
+}
+
+// Helper function to register multiple Scratch endpoints at once
+export async function registerScratchEndpoints(
+  app: Hono,
+  endpoints: ScratchEndpointDefinition[]
+) {
+  await Promise.all(
+    endpoints.map((endpoint) => registerScratchEndpoint(app, endpoint))
+  );
 }
