@@ -5,6 +5,7 @@ import { marked } from "marked";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { jwtVerify } from "jose";
+import { Universe } from "./src";
 
 // Get the directory where this file is located
 const __filename = fileURLToPath(import.meta.url);
@@ -12,6 +13,17 @@ const __dirname = dirname(__filename);
 const projectRoot = __dirname;
 
 const app = new Hono();
+
+// Initialize Universe instance on startup
+let universe: Universe | null = null;
+(async () => {
+  try {
+    universe = await Universe.construct({ gsuite: true });
+    console.log("Universe initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize Universe:", error);
+  }
+})();
 
 // Email queue storage
 interface QueuedEmail {
@@ -170,522 +182,54 @@ app.post("/api/queue-email", async (c) => {
   }
 });
 
-// Admin page
-app.get("/admin", async (c) => {
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Email Queue Admin</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-      padding: 20px;
-      background: #f5f5f5;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    h1 { margin-bottom: 20px; }
-    .auth-section {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #f9f9f9;
-      border-radius: 4px;
-    }
-    input[type="password"] {
-      padding: 8px;
-      width: 300px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      margin-right: 10px;
-    }
-    button {
-      padding: 8px 16px;
-      background: #0366d6;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    button:hover { background: #0256c2; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    .actions {
-      margin: 20px 0;
-      display: flex;
-      gap: 10px;
-    }
-    .queue-info {
-      margin: 20px 0;
-      padding: 10px;
-      background: #e8f4f8;
-      border-radius: 4px;
-    }
-    .email-list {
-      margin-top: 20px;
-    }
-    .email-item {
-      padding: 8px 12px;
-      margin: 4px 0;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background: #fafafa;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .email-item input[type="checkbox"] {
-      margin: 0;
-      cursor: pointer;
-    }
-    .email-item-content {
-      flex: 1;
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      font-size: 14px;
-    }
-    .email-item-content > span {
-      min-width: 0;
-    }
-    .email-to { font-weight: 500; min-width: 200px; }
-    .email-from { color: #666; min-width: 200px; }
-    .email-subject { flex: 1; }
-    .email-time { color: #999; font-size: 12px; min-width: 150px; }
-    .select-all {
-      margin-bottom: 10px;
-      padding: 8px;
-      background: #f0f0f0;
-      border-radius: 4px;
-    }
-    .select-all label {
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .status {
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    .status.success { background: #d4edda; color: #155724; }
-    .status.error { background: #f8d7da; color: #721c24; }
-    .status.info { background: #d1ecf1; color: #0c5460; }
-    .user-info {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding: 10px;
-      background: #f9f9f9;
-      border-radius: 4px;
-    }
-    .user-info span { font-weight: 500; }
-    .add-email-form {
-      margin: 20px 0;
-      padding: 15px;
-      background: #f9f9f9;
-      border-radius: 4px;
-    }
-    .add-email-form h3 { margin-bottom: 15px; }
-    .form-group {
-      margin-bottom: 10px;
-    }
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 500;
-    }
-    .form-group input,
-    .form-group textarea {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-family: inherit;
-    }
-    .form-group textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
-    button.secondary {
-      background: #6c757d;
-    }
-    button.secondary:hover {
-      background: #5a6268;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Email Queue Admin</h1>
-    
-    <div class="auth-section" id="authSection">
-      <p>Enter JWT token to authenticate:</p>
-      <input type="password" id="jwtInput" placeholder="JWT Token">
-      <button onclick="authenticate()">Authenticate</button>
-      <div id="authStatus"></div>
-    </div>
-
-    <div id="adminContent" style="display: none;">
-      <div class="user-info">
-        <span>Logged in as: <strong id="userEmail">-</strong></span>
-        <button onclick="logout()" class="secondary">Logout</button>
-      </div>
-
-      <div class="add-email-form">
-        <h3>Add Email to Queue</h3>
-        <div class="form-group">
-          <label>From:</label>
-          <input type="email" id="addFrom" placeholder="sender@example.com" value="scratch-demo@divizend.ai">
-        </div>
-        <div class="form-group">
-          <label>To:</label>
-          <input type="email" id="addTo" placeholder="recipient@example.com">
-        </div>
-        <div class="form-group">
-          <label>Subject:</label>
-          <input type="text" id="addSubject" placeholder="Email subject">
-        </div>
-        <div class="form-group">
-          <label>Content:</label>
-          <textarea id="addContent" placeholder="Email content"></textarea>
-        </div>
-        <button onclick="addEmail()" id="addBtn">Add to Queue</button>
-      </div>
-
-      <div class="queue-info">
-        <strong>Queue Status:</strong> <span id="queueCount">0</span> emails queued
-      </div>
-
-      <div class="actions">
-        <button onclick="loadQueue()">Refresh Queue</button>
-        <button onclick="sendAllEmails()" id="sendBtn">Send All Emails</button>
-        <button onclick="sendSelectedEmails()" id="sendSelectedBtn">Send Selected</button>
-        <button onclick="removeSelectedEmails()" id="removeSelectedBtn">Remove Selected</button>
-        <button onclick="clearQueue()" id="clearBtn">Clear Queue</button>
-      </div>
-
-      <div id="status"></div>
-
-      <div class="email-list" id="emailList"></div>
-    </div>
-  </div>
-
-  <script>
-    let token = localStorage.getItem('adminToken') || '';
-    
-    if (token) {
-      document.getElementById('jwtInput').value = token;
-      authenticate();
-    }
-
-    async function authenticate() {
-      token = document.getElementById('jwtInput').value;
-      if (!token) {
-        showStatus('Please enter a JWT token', 'error', 'authStatus');
-        return;
-      }
-      localStorage.setItem('adminToken', token);
-      
-      // Get user info
-      try {
-        const response = await fetch('/admin/api/user', {
-          headers: { 'Authorization': \`Bearer \${token}\` }
-        });
-        if (response.status === 401) {
-          showStatus('Authentication failed', 'error', 'authStatus');
-          return;
-        }
-        const userData = await response.json();
-        document.getElementById('userEmail').textContent = userData.email || 'Unknown';
-      } catch (error) {
-        console.error('Failed to get user info:', error);
-      }
-      
-      document.getElementById('authSection').style.display = 'none';
-      document.getElementById('adminContent').style.display = 'block';
-      loadQueue();
-    }
-
-    function logout() {
-      localStorage.removeItem('adminToken');
-      token = '';
-      document.getElementById('jwtInput').value = '';
-      document.getElementById('authSection').style.display = 'block';
-      document.getElementById('adminContent').style.display = 'none';
-      document.getElementById('userEmail').textContent = '-';
-    }
-
-    async function addEmail() {
-      const from = document.getElementById('addFrom').value;
-      const to = document.getElementById('addTo').value;
-      const subject = document.getElementById('addSubject').value;
-      const content = document.getElementById('addContent').value;
-
-      if (!from || !to || !subject || !content) {
-        showStatus('Please fill in all fields', 'error');
-        return;
-      }
-
-      const btn = document.getElementById('addBtn');
-      btn.disabled = true;
-
-      try {
-        const response = await fetch('/api/queue-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from, to, subject, content })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-          // Clear form
-          document.getElementById('addTo').value = '';
-          document.getElementById('addSubject').value = '';
-          document.getElementById('addContent').value = '';
-          loadQueue();
-        } else {
-          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
-        }
-      } catch (error) {
-        showStatus('Failed to add email: ' + error.message, 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function loadQueue() {
-      try {
-        const response = await fetch('/admin/api/queue', {
-          headers: { 'Authorization': \`Bearer \${token}\` }
-        });
-        if (response.status === 401) {
-          showStatus('Authentication failed. Please re-authenticate.', 'error', 'authStatus');
-          document.getElementById('authSection').style.display = 'block';
-          document.getElementById('adminContent').style.display = 'none';
-          return;
-        }
-        const data = await response.json();
-        document.getElementById('queueCount').textContent = data.queue.length;
-        displayEmails(data.queue);
-      } catch (error) {
-        showStatus('Failed to load queue: ' + error.message, 'error');
-      }
-    }
-
-    function displayEmails(emails) {
-      const list = document.getElementById('emailList');
-      if (emails.length === 0) {
-        list.innerHTML = '<p>No emails in queue</p>';
-        return;
-      }
-      list.innerHTML = \`
-        <div class="select-all">
-          <label>
-            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
-            Select All
-          </label>
-        </div>
-      \` + emails.map(email => \`
-        <div class="email-item">
-          <input type="checkbox" class="email-checkbox" value="\${email.id}">
-          <div class="email-item-content">
-            <span class="email-to">\${email.to}</span>
-            <span class="email-from">\${email.from}</span>
-            <span class="email-subject">\${email.subject}</span>
-            <span class="email-time">\${new Date(email.queuedAt).toLocaleString()}</span>
-          </div>
-        </div>
-      \`).join('');
-    }
-
-    function toggleSelectAll() {
-      const selectAll = document.getElementById('selectAll');
-      const checkboxes = document.querySelectorAll('.email-checkbox');
-      checkboxes.forEach(cb => cb.checked = selectAll.checked);
-    }
-
-    function getSelectedEmailIds() {
-      const checkboxes = document.querySelectorAll('.email-checkbox:checked');
-      return Array.from(checkboxes).map(cb => cb.value);
-    }
-
-    async function sendAllEmails() {
-      const btn = document.getElementById('sendBtn');
-      btn.disabled = true;
-      showStatus('Sending emails...', 'info');
-      
-      try {
-        const response = await fetch('/admin/api/queue/send', {
-          method: 'POST',
-          headers: { 
-            'Authorization': \`Bearer \${token}\`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ ids: null }) // null means send all
-        });
-        
-        if (response.status === 401) {
-          showStatus('Authentication failed', 'error');
-          return;
-        }
-        
-        const data = await response.json();
-        if (data.success) {
-          showStatus(\`Successfully sent \${data.sent} email(s)\`, 'success');
-        } else {
-          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
-        }
-        loadQueue();
-      } catch (error) {
-        showStatus('Failed to send emails: ' + error.message, 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function sendSelectedEmails() {
-      const selectedIds = getSelectedEmailIds();
-      if (selectedIds.length === 0) {
-        showStatus('Please select at least one email', 'error');
-        return;
-      }
-
-      const btn = document.getElementById('sendSelectedBtn');
-      btn.disabled = true;
-      showStatus(\`Sending \${selectedIds.length} email(s)...\`, 'info');
-      
-      try {
-        const response = await fetch('/admin/api/queue/send', {
-          method: 'POST',
-          headers: { 
-            'Authorization': \`Bearer \${token}\`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ ids: selectedIds })
-        });
-        
-        if (response.status === 401) {
-          showStatus('Authentication failed', 'error');
-          return;
-        }
-        
-        const data = await response.json();
-        if (data.success) {
-          showStatus(\`Successfully sent \${data.sent} email(s)\`, 'success');
-        } else {
-          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
-        }
-        loadQueue();
-      } catch (error) {
-        showStatus('Failed to send emails: ' + error.message, 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function removeSelectedEmails() {
-      const selectedIds = getSelectedEmailIds();
-      if (selectedIds.length === 0) {
-        showStatus('Please select at least one email', 'error');
-        return;
-      }
-
-      if (!confirm(\`Are you sure you want to remove \${selectedIds.length} email(s) from the queue?\`)) {
-        return;
-      }
-
-      const btn = document.getElementById('removeSelectedBtn');
-      btn.disabled = true;
-      
-      try {
-        const response = await fetch('/admin/api/queue/remove', {
-          method: 'POST',
-          headers: { 
-            'Authorization': \`Bearer \${token}\`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ ids: selectedIds })
-        });
-        
-        if (response.status === 401) {
-          showStatus('Authentication failed', 'error');
-          return;
-        }
-        
-        const data = await response.json();
-        if (data.success) {
-          showStatus(\`Removed \${data.removed} email(s)\`, 'success');
-        } else {
-          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
-        }
-        loadQueue();
-      } catch (error) {
-        showStatus('Failed to remove emails: ' + error.message, 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function clearQueue() {
-      if (!confirm('Are you sure you want to clear the entire queue?')) {
-        return;
-      }
-      
-      const btn = document.getElementById('clearBtn');
-      btn.disabled = true;
-      
-      try {
-        const response = await fetch('/admin/api/queue/clear', {
-          method: 'POST',
-          headers: { 'Authorization': \`Bearer \${token}\` }
-        });
-        
-        if (response.status === 401) {
-          showStatus('Authentication failed', 'error');
-          return;
-        }
-        
-        const data = await response.json();
-        if (data.success) {
-          // showStatus('Queue cleared', 'success');
-        } else {
-          showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
-        }
-        loadQueue();
-      } catch (error) {
-        showStatus('Failed to clear queue: ' + error.message, 'error');
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    function showStatus(message, type, elementId = 'status') {
-      const el = document.getElementById(elementId);
-      el.innerHTML = \`<div class="status \${type}">\${message}</div>\`;
-      setTimeout(() => {
-        if (elementId === 'status') el.innerHTML = '';
-      }, 5000);
-    }
-  </script>
-</body>
-</html>`;
-  return c.html(html);
-});
-
 // Admin API: Get user info
 app.get("/admin/api/user", jwtAuth, async (c) => {
   const payload = await getJwtPayload(c);
   return c.json({ email: (payload as any)?.email || "Unknown" });
+});
+
+// Admin API: Health check for googleapis connection
+app.get("/admin/api/health", jwtAuth, async (c) => {
+  if (!universe || !universe.gsuite) {
+    return c.json({
+      status: "error",
+      message: "Universe not initialized",
+      connected: false,
+    });
+  }
+
+  try {
+    // Test connection by trying to get domains from the first organization
+    const orgConfigs = (universe.gsuite as any).orgConfigs;
+    if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
+      return c.json({
+        status: "error",
+        message: "No GSuite organizations configured",
+        connected: false,
+      });
+    }
+
+    const firstOrg = Object.keys(orgConfigs)[0];
+    const orgConfig = orgConfigs[firstOrg];
+    const gsuiteUser = universe.gsuite.user(orgConfig.adminUser);
+    const admin = gsuiteUser.admin();
+
+    // Try to list domains as a health check
+    await admin.getDomains();
+
+    return c.json({
+      status: "ok",
+      message: "Google APIs connection active",
+      connected: true,
+      organization: firstOrg,
+    });
+  } catch (error) {
+    return c.json({
+      status: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+      connected: false,
+    });
+  }
 });
 
 // Admin API: Get queue
