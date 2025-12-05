@@ -35,8 +35,78 @@ interface QueuedEmail {
   queuedAt: number;
 }
 
+// Scratch extension block definition
+interface ScratchBlock {
+  opcode: string;
+  blockType: "command" | "reporter" | "boolean" | "hat";
+  text: string;
+  arguments: {
+    [key: string]: {
+      type: "string" | "number" | "boolean";
+      defaultValue: string | number | boolean;
+    };
+  };
+}
+
+// Scratch endpoint annotation
+interface ScratchEndpoint {
+  opcode: string;
+  block: ScratchBlock;
+  endpoint: string;
+}
+
 const emailQueue: QueuedEmail[] = [];
 let isSending = false;
+
+// Scratch extension configuration
+const SCRATCH_BASE_URL =
+  process.env.SCRATCH_BASE_URL || "https://scratch.divizend.ai";
+const ORG_NAME = process.env.ORG_NAME || "divizend";
+
+// Registry of Scratch endpoints
+const scratchEndpoints: ScratchEndpoint[] = [];
+
+// Helper function to convert string to PascalCase (first letter uppercase, rest lowercase)
+function toPascalCase(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+// Helper function to convert hyphenated string to PascalCase
+function hyphenatedToPascalCase(str: string): string {
+  return str
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join("");
+}
+
+// Helper function to convert hyphenated string to Title Case
+function toTitleCase(str: string): string {
+  return str
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+// Helper function to generate extension ID and name from hyphenated string
+function generateExtensionInfo(name: string): {
+  id: string;
+  displayName: string;
+} {
+  const orgPascalCase = toPascalCase(ORG_NAME);
+  const namePascalCase = hyphenatedToPascalCase(name);
+  const nameTitleCase = toTitleCase(name);
+  return {
+    id: `${orgPascalCase}${namePascalCase}`,
+    displayName: `${orgPascalCase} (${nameTitleCase})`,
+  };
+}
+
+// Helper function to register a Scratch endpoint
+// Automatically generates endpoint path as /api/{opcode} and uses POST method
+function registerScratchEndpoint(opcode: string, block: ScratchBlock) {
+  const endpoint = `/api/${opcode}`;
+  scratchEndpoints.push({ opcode, block, endpoint });
+}
 
 // JWT secret from environment
 const JWT_SECRET = process.env.WEB_UI_JWT_SECRET || "";
@@ -144,7 +214,31 @@ app.get("/", async (c) => {
 });
 
 // Email endpoint - queues emails instead of sending immediately
-app.post("/api/queue-email", async (c) => {
+registerScratchEndpoint("queueEmail", {
+  opcode: "queueEmail",
+  blockType: "command",
+  text: "queue email [from] [to] [subject] [content]",
+  arguments: {
+    from: {
+      type: "string",
+      defaultValue: "scratch-demo@divizend.ai",
+    },
+    to: {
+      type: "string",
+      defaultValue: "julian.nalenz@divizend.com",
+    },
+    subject: {
+      type: "string",
+      defaultValue: "Hello from a Scratch block!",
+    },
+    content: {
+      type: "string",
+      defaultValue: "This email was sent from a Scratch block!",
+    },
+  },
+});
+
+app.post("/api/queueEmail", async (c) => {
   try {
     const { from, to, subject, content } = await c.req.json();
 
@@ -337,6 +431,72 @@ app.post("/admin/api/queue/remove", jwtAuth, async (c) => {
     success: true,
     removed,
     message: `Removed ${removed} email(s)`,
+  });
+});
+
+// Generate and serve Scratch extension file dynamically
+// Route pattern: /{name}.js where name is hyphenated (e.g., julian-nalenz)
+app.get("*", async (c, next) => {
+  const path = c.req.path;
+
+  // Only handle paths that match /{name}.js pattern (not admin, api, etc.)
+  const match = path.match(/^\/([a-z0-9-]+)\.js$/);
+
+  if (!match) {
+    return next();
+  }
+
+  const name = match[1];
+
+  // Validate name format (only lowercase letters, numbers, and hyphens)
+  if (!/^[a-z0-9-]+$/.test(name)) {
+    return c.text("Invalid extension name format", 400);
+  }
+
+  // Generate extension ID and name from the hyphenated string
+  const { id: extensionId, displayName: extensionName } =
+    generateExtensionInfo(name);
+
+  // Generate the Scratch extension class
+  const blocks = scratchEndpoints.map((ep) => ep.block);
+  const methods = scratchEndpoints
+    .map((ep) => {
+      const params = Object.keys(ep.block.arguments);
+      const paramList = params.join(", ");
+      const fetchBody =
+        params.length > 0
+          ? `body: JSON.stringify({ ${params.map((p) => `${p}`).join(", ")} })`
+          : "";
+
+      return `  ${ep.opcode}({ ${paramList} }) {
+    return fetch("${SCRATCH_BASE_URL}${ep.endpoint}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      }${fetchBody ? `,\n      ${fetchBody}` : ""}
+    }).then((response) => response.text());
+  }`;
+    })
+    .join("\n\n");
+
+  const extensionCode = `class ${extensionId} {
+  constructor() {}
+
+  getInfo() {
+    return {
+      id: "${extensionId}",
+      name: "${extensionName}",
+      blocks: ${JSON.stringify(blocks, null, 2)},
+    };
+  }
+
+${methods}
+}
+
+Scratch.extensions.register(new ${extensionId}());`;
+
+  return c.text(extensionCode, 200, {
+    "Content-Type": "application/javascript; charset=utf-8",
   });
 });
 
