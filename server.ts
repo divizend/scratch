@@ -129,11 +129,95 @@ function generateExtensionInfo(name: string): {
   };
 }
 
+// Validation middleware that checks request body against block arguments
+function validateArguments(block: ScratchBlock) {
+  return async (c: any, next: any) => {
+    try {
+      const body = await c.req.json();
+      const errors: string[] = [];
+      const validatedBody: any = { ...body };
+
+      // Check all arguments defined in the block
+      if (block.arguments) {
+        for (const [key, arg] of Object.entries(block.arguments)) {
+          // If argument is missing
+          if (!(key in validatedBody)) {
+            // If it has a default value, apply it
+            if (arg.defaultValue !== undefined) {
+              validatedBody[key] = arg.defaultValue;
+            } else {
+              // Otherwise, it's required and missing
+              errors.push(`Missing required parameter: ${key}`);
+            }
+          }
+        }
+      }
+
+      if (errors.length > 0) {
+        return c.json(
+          {
+            error: "Validation failed",
+            errors,
+          },
+          400
+        );
+      }
+
+      // Attach validated body (with defaults applied) to context for use in handler
+      c.validatedBody = validatedBody;
+      return next();
+    } catch (error) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+  };
+}
+
 // Helper function to register a Scratch endpoint
 // Automatically generates endpoint path as /api/{opcode} and uses POST method
-function registerScratchEndpoint(opcode: string, block: ScratchBlock) {
-  const endpoint = `/api/${opcode}`;
-  scratchEndpoints.push({ opcode, block, endpoint });
+// Also registers the route handler with Hono
+// Automatically applies JWT auth (unless noAuth is true), argument validation, try-catch, and JSON response
+function registerScratchEndpoint({
+  block,
+  handler,
+  noAuth = false,
+}: {
+  block: ScratchBlock;
+  handler: (c: any) => Promise<any> | any;
+  noAuth?: boolean;
+}) {
+  const endpoint = `/api/${block.opcode}`;
+  scratchEndpoints.push({ opcode: block.opcode, block, endpoint });
+
+  // Wrap handler with automatic error handling and JSON response
+  const wrappedHandler = async (c: any) => {
+    try {
+      const result = await handler(c);
+      // If handler returns a Response, use it directly
+      if (result instanceof Response) {
+        return result;
+      }
+      // Otherwise, wrap in JSON response
+      return c.json(result || { success: true });
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        500
+      );
+    }
+  };
+
+  // Build middleware array conditionally
+  const middlewares: Array<(c: any, next?: any) => Promise<any> | any> = [];
+  if (!noAuth) {
+    middlewares.push(jwtAuth);
+  }
+  middlewares.push(validateArguments(block));
+  middlewares.push(wrappedHandler);
+
+  // Register the route with Hono
+  app.post(endpoint, ...middlewares);
 }
 
 // JWT secret from environment
@@ -261,42 +345,33 @@ app.get("/", async (c) => {
 });
 
 // Email endpoint - queues emails instead of sending immediately
-registerScratchEndpoint("queueEmail", {
-  opcode: "queueEmail",
-  blockType: "command",
-  text: "queue email [from] [to] [subject] [content]",
-  arguments: {
-    from: {
-      type: "string",
-      defaultValue: "scratch-demo@divizend.ai",
-    },
-    to: {
-      type: "string",
-      defaultValue: "julian.nalenz@divizend.com",
-    },
-    subject: {
-      type: "string",
-      defaultValue: "Hello from a Scratch block!",
-    },
-    content: {
-      type: "string",
-      defaultValue: "This email was sent from a Scratch block!",
+registerScratchEndpoint({
+  block: {
+    opcode: "queueEmail",
+    blockType: "command",
+    text: "queue email [from] [to] [subject] [content]",
+    arguments: {
+      from: {
+        type: "string",
+        defaultValue: "scratch-demo@divizend.ai",
+      },
+      to: {
+        type: "string",
+        defaultValue: "julian.nalenz@divizend.com",
+      },
+      subject: {
+        type: "string",
+        defaultValue: "Hello from a Scratch block!",
+      },
+      content: {
+        type: "string",
+        defaultValue: "This email was sent from a Scratch block!",
+      },
     },
   },
-});
-
-app.post("/api/queueEmail", jwtAuth, async (c) => {
-  try {
-    const { from, to, subject, content } = await c.req.json();
-
-    if (!from || !to || !subject || !content) {
-      return c.json(
-        {
-          error: "Missing required parameters: from, to, subject, content",
-        },
-        400
-      );
-    }
+  handler: (c) => {
+    // Use validated body from middleware
+    const { from, to, subject, content } = c.validatedBody;
 
     // Add to queue instead of sending immediately
     const queuedEmail: QueuedEmail = {
@@ -310,17 +385,12 @@ app.post("/api/queueEmail", jwtAuth, async (c) => {
 
     emailQueue.push(queuedEmail);
 
-    return c.json({
+    return {
       success: true,
       id: queuedEmail.id,
       message: "Email queued",
-    });
-  } catch (error) {
-    return c.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      500
-    );
-  }
+    };
+  },
 });
 
 // Admin API: Get available domains (public, for JWT sending)
