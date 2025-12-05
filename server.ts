@@ -285,7 +285,7 @@ registerScratchEndpoint("queueEmail", {
   },
 });
 
-app.post("/api/queueEmail", async (c) => {
+app.post("/api/queueEmail", jwtAuth, async (c) => {
   try {
     const { from, to, subject, content } = await c.req.json();
 
@@ -659,6 +659,7 @@ app.get("*", async (c, next) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": "Bearer ${jwtToken}",
       }${fetchBody ? `,\n      ${fetchBody}` : ""}
     }).then((response) => response.text());
   }`;
