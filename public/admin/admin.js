@@ -130,6 +130,37 @@ async function authenticate() {
   loadHealthCheck();
 }
 
+function openScratch() {
+  if (!token) {
+    showStatus("No token available", "error");
+    return;
+  }
+
+  // Construct Scratch URL with the JWT token
+  const baseUrl = window.location.origin;
+  const extensionUrl = `${baseUrl}/extension/${token}.js`;
+  const scratchUrl = `https://sheeptester.github.io/scratch-gui/?url=${encodeURIComponent(
+    extensionUrl
+  )}`;
+
+  // Open in new tab
+  window.open(scratchUrl, "_blank");
+}
+
+function openScratchSource() {
+  if (!token) {
+    showStatus("No token available", "error");
+    return;
+  }
+
+  // Construct extension source URL with the JWT token
+  const baseUrl = window.location.origin;
+  const extensionUrl = `${baseUrl}/extension/${token}.js`;
+
+  // Open extension source in new tab
+  window.open(extensionUrl, "_blank");
+}
+
 function logout() {
   localStorage.removeItem("adminToken");
   token = "";

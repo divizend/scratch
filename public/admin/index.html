@@ -16,19 +16,32 @@
         <button onclick="authenticate()">Authenticate</button>
         <div id="authStatus"></div>
 
-        <div id="jwtSendSection" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <div
+          id="jwtSendSection"
+          style="
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+          "
+        >
           <p><strong>Or send a new JWT token to your email:</strong></p>
-          <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="display: flex; gap: 10px; align-items: center">
             <input
               type="email"
               id="jwtEmailInput"
               placeholder="your-email@domain.com"
-              style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+              style="
+                flex: 1;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+              "
             />
             <button onclick="sendJWT()" id="sendJwtBtn">Send JWT</button>
           </div>
-          <div id="jwtSendStatus" style="margin-top: 10px;"></div>
-          <p style="font-size: 12px; color: #666; margin-top: 10px;">
+          <div id="jwtSendStatus" style="margin-top: 10px"></div>
+          <p style="font-size: 12px; color: #666; margin-top: 10px">
             Allowed domains: <span id="allowedDomains">-</span>
           </p>
         </div>
@@ -37,7 +50,15 @@
       <div id="adminContent" style="display: none">
         <div class="user-info">
           <span>Logged in as: <strong id="userEmail">-</strong></span>
-          <button onclick="logout()" class="secondary">Logout</button>
+          <div style="display: flex; gap: 10px">
+            <button onclick="openScratch()" id="openScratchBtn">
+              Open Scratch
+            </button>
+            <button onclick="openScratchSource()" id="openScratchSourceBtn">
+              View Extension Source
+            </button>
+            <button onclick="logout()" class="secondary">Logout</button>
+          </div>
         </div>
 
         <div class="health-check" id="healthCheck">

@@ -59,9 +59,31 @@ const emailQueue: QueuedEmail[] = [];
 let isSending = false;
 
 // Scratch extension configuration
-const SCRATCH_BASE_URL =
-  process.env.SCRATCH_BASE_URL || "https://scratch.divizend.ai";
+const HOSTED_AT = process.env.HOSTED_AT || "scratch.divizend.ai";
 const ORG_NAME = process.env.ORG_NAME || "divizend";
+const port = process.env.PORT || 3000;
+
+// Determine the base URL for the extension based on whether we're running locally
+function getBaseUrl(c: any): string {
+  const host = c.req.header("host") || "";
+  const isLocal =
+    host.includes("localhost") ||
+    host.includes("127.0.0.1") ||
+    host.includes("::1") ||
+    host.startsWith("127.") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("10.");
+
+  if (isLocal) {
+    return `http://localhost:${port}`;
+  }
+
+  // Use HOSTED_AT, ensuring it has a protocol
+  const hostedAt = HOSTED_AT.startsWith("http")
+    ? HOSTED_AT
+    : `https://${HOSTED_AT}`;
+  return hostedAt;
+}
 
 // Registry of Scratch endpoints
 const scratchEndpoints: ScratchEndpoint[] = [];
@@ -85,6 +107,12 @@ function toTitleCase(str: string): string {
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+// Helper function to convert email to hyphenated name (e.g., "julian.nalenz@divizend.com" -> "julian-nalenz")
+function emailToHyphenatedName(email: string): string {
+  const localPart = email.split("@")[0] || "";
+  return localPart.replace(/\./g, "-").toLowerCase();
 }
 
 // Helper function to generate extension ID and name from hyphenated string
@@ -112,7 +140,21 @@ function registerScratchEndpoint(opcode: string, block: ScratchBlock) {
 const JWT_SECRET = process.env.WEB_UI_JWT_SECRET || "";
 const JWT_SECRET_KEY = JWT_SECRET ? new TextEncoder().encode(JWT_SECRET) : null;
 
-// Helper to extract JWT payload
+// Helper to validate JWT token and extract payload
+async function validateJwtToken(token: string): Promise<any | null> {
+  if (!JWT_SECRET_KEY) {
+    return null;
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET_KEY);
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Helper to extract JWT payload from request header
 const getJwtPayload = async (c: any) => {
   if (!JWT_SECRET_KEY) {
     return null;
@@ -124,12 +166,7 @@ const getJwtPayload = async (c: any) => {
   }
 
   const token = authHeader.substring(7);
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET_KEY);
-    return payload;
-  } catch (error) {
-    return null;
-  }
+  return await validateJwtToken(token);
 };
 
 // JWT authentication middleware
@@ -570,27 +607,41 @@ app.post("/admin/api/queue/remove", jwtAuth, async (c) => {
 });
 
 // Generate and serve Scratch extension file dynamically
-// Route pattern: /{name}.js where name is hyphenated (e.g., julian-nalenz)
+// Route pattern: /extension/{jwt}.js where jwt is a valid JWT token
 app.get("*", async (c, next) => {
   const path = c.req.path;
 
-  // Only handle paths that match /{name}.js pattern (not admin, api, etc.)
-  const match = path.match(/^\/([a-z0-9-]+)\.js$/);
+  // Only handle paths that match /extension/{jwt}.js pattern (not admin, api, etc.)
+  // JWT tokens contain base64url characters: a-z, A-Z, 0-9, -, _, and dots
+  const match = path.match(/^\/extension\/([A-Za-z0-9\-_\.]+)\.js$/);
 
   if (!match) {
     return next();
   }
 
-  const name = match[1];
+  const jwtToken = match[1];
 
-  // Validate name format (only lowercase letters, numbers, and hyphens)
-  if (!/^[a-z0-9-]+$/.test(name)) {
-    return c.text("Invalid extension name format", 400);
+  // Validate JWT token
+  const payload = await validateJwtToken(jwtToken);
+  if (!payload) {
+    return c.text("Invalid or expired JWT token", 401);
   }
 
-  // Generate extension ID and name from the hyphenated string
+  // Extract email from JWT payload
+  const email = (payload as any)?.email;
+  if (!email || typeof email !== "string") {
+    return c.text("JWT token does not contain a valid email address", 400);
+  }
+
+  // Convert email to hyphenated name (e.g., "julian.nalenz@divizend.com" -> "julian-nalenz")
+  const name = emailToHyphenatedName(email);
+
+  // Generate extension ID and name from the email-derived name
   const { id: extensionId, displayName: extensionName } =
     generateExtensionInfo(name);
+
+  // Determine the base URL for this request
+  const baseUrl = getBaseUrl(c);
 
   // Generate the Scratch extension class
   const blocks = scratchEndpoints.map((ep) => ep.block);
@@ -604,7 +655,7 @@ app.get("*", async (c, next) => {
           : "";
 
       return `  ${ep.opcode}({ ${paramList} }) {
-    return fetch("${SCRATCH_BASE_URL}${ep.endpoint}", {
+    return fetch("${baseUrl}${ep.endpoint}", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -638,7 +689,6 @@ Scratch.extensions.register(new ${extensionId}());`;
 // Serve static files from public directory
 app.use("/*", serveStatic({ root: join(projectRoot, "public") }));
 
-const port = process.env.PORT || 3000;
 console.log(`Server running on http://localhost:${port}`);
 
 export default {
