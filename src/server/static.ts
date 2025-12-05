@@ -7,8 +7,31 @@ import { join } from "path";
 export function registerStaticRoutes(app: Hono, projectRoot: string) {
   app.get("/", async (c) => {
     try {
-      const readmePath = join(projectRoot, "README.md");
-      const readme = await Bun.file(readmePath).text();
+      // Try multiple possible paths for README.md
+      const possiblePaths = [
+        join(projectRoot, "README.md"),
+        join(process.cwd(), "README.md"),
+        "README.md",
+      ];
+
+      let readme: string | null = null;
+      for (const readmePath of possiblePaths) {
+        try {
+          const file = Bun.file(readmePath);
+          if (await file.exists()) {
+            readme = await file.text();
+            break;
+          }
+        } catch (error) {
+          // Continue to next path
+          continue;
+        }
+      }
+
+      if (!readme) {
+        return c.text("README.md not found", 404);
+      }
+
       let html = await marked(readme);
 
       // Add target="_blank" and rel="noopener noreferrer" to all links
