@@ -4,8 +4,8 @@ import { cors } from "hono/cors";
 import { marked } from "marked";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { jwtVerify } from "jose";
-import { Universe } from "./src";
+import { jwtVerify, SignJWT } from "jose";
+import { Universe, Resend } from "./src";
 
 // Get the directory where this file is located
 const __filename = fileURLToPath(import.meta.url);
@@ -276,6 +276,135 @@ app.post("/api/queueEmail", async (c) => {
   }
 });
 
+// Admin API: Get available domains (public, for JWT sending)
+app.get("/admin/api/domains", async (c) => {
+  if (!universe || !universe.gsuite) {
+    return c.json({ domains: [], available: false });
+  }
+
+  try {
+    const orgConfigs = (universe.gsuite as any).orgConfigs;
+    if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
+      return c.json({ domains: [], available: false });
+    }
+
+    // Collect all domains from all organizations
+    const allDomains: string[] = [];
+    for (const orgConfig of Object.values(orgConfigs) as any[]) {
+      for (const domain of orgConfig.domains) {
+        if (domain.domainName) {
+          allDomains.push(domain.domainName);
+        }
+      }
+    }
+
+    return c.json({ domains: allDomains, available: true });
+  } catch (error) {
+    return c.json({
+      domains: [],
+      available: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+// Admin API: Send JWT token via email
+app.post("/admin/api/send-jwt", async (c) => {
+  if (!universe || !universe.gsuite) {
+    return c.json({ error: "Google Workspace not connected" }, 400);
+  }
+
+  const { email } = await c.req.json();
+  if (!email || typeof email !== "string") {
+    return c.json({ error: "Email address is required" }, 400);
+  }
+
+  // Validate email domain
+  const emailDomain = email.split("@")[1];
+  if (!emailDomain) {
+    return c.json({ error: "Invalid email address" }, 400);
+  }
+
+  try {
+    const orgConfigs = (universe.gsuite as any).orgConfigs;
+    if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
+      return c.json(
+        { error: "No Google Workspace organizations configured" },
+        400
+      );
+    }
+
+    // Check if email domain matches any organization domain
+    let matchingOrg: any = null;
+    for (const orgConfig of Object.values(orgConfigs) as any[]) {
+      for (const domain of orgConfig.domains) {
+        if (domain.domainName === emailDomain) {
+          matchingOrg = orgConfig;
+          break;
+        }
+      }
+      if (matchingOrg) break;
+    }
+
+    if (!matchingOrg) {
+      return c.json(
+        {
+          error: `Email domain ${emailDomain} is not part of any configured Google Workspace organization`,
+        },
+        400
+      );
+    }
+
+    // Generate JWT token
+    const JWT_SECRET = process.env.WEB_UI_JWT_SECRET || "";
+    if (!JWT_SECRET) {
+      return c.json({ error: "JWT secret not configured" }, 500);
+    }
+
+    const secretKey = new TextEncoder().encode(JWT_SECRET);
+    const jwt = await new SignJWT({
+      email: email,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("1y")
+      .sign(secretKey);
+
+    // Send email via Resend
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      return c.json(
+        { error: "RESEND_API_KEY environment variable is not set" },
+        500
+      );
+    }
+
+    const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
+    const resend = new Resend(resendApiKey, resendApiRoot);
+
+    const response = await resend.sendEmail({
+      from: "jwt-issuer@divizend.ai",
+      to: email,
+      subject: "Admin Access Token",
+      html: `<p>Your admin access token is:</p><pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${jwt}</pre><p>Use this token to authenticate in the admin interface.</p>`,
+    });
+
+    if (!response.ok) {
+      return c.json({ error: `Failed to send email: ${response.text}` }, 500);
+    }
+
+    return c.json({ success: true, message: "JWT token sent successfully" });
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to send JWT token",
+      },
+      500
+    );
+  }
+});
+
 // Admin API: Get user info
 app.get("/admin/api/user", jwtAuth, async (c) => {
   const payload = await getJwtPayload(c);
@@ -361,6 +490,9 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
     );
   }
 
+  const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
+  const resend = new Resend(resendApiKey, resendApiRoot);
+
   isSending = true;
   let sent = 0;
   let errors = 0;
@@ -369,18 +501,11 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
   for (let i = 0; i < emailsToSend.length; i++) {
     const email = emailsToSend[i];
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: email.from,
-          to: [email.to],
-          subject: email.subject,
-          html: `<p>${email.content}</p>`,
-        }),
+      const response = await resend.sendEmail({
+        from: email.from,
+        to: email.to,
+        subject: email.subject,
+        html: `<p>${email.content}</p>`,
       });
 
       if (response.ok) {
