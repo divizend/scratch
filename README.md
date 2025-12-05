@@ -14,7 +14,7 @@ The web server defined in this repository ([github.com/divizend/scratch](https:/
 ## Local setup
 
 1. `cp .env.example .env`
-2. Add your own `WEB_UI_JWT_SECRET` and `RESEND_API_KEY` in your `.env`. Follow the instructions below if you would also like to set up the integration with Google Workspace.
+2. Update the different secrets in your `.env`. Follow the instructions below if you would also like to set up the integration with Google Workspace.
 3. Run `bun install`
 4. Run `bun tools/generate-token.ts`
 5. Run `bun run dev`
