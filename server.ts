@@ -53,29 +53,34 @@ app.use("*", async (c, next) => {
 // Register static routes (README, admin interface)
 registerStaticRoutes(app, projectRoot);
 
-// Register all Scratch endpoints
-registerEndpoints(app);
+// Register all Scratch endpoints and log them
+(async () => {
+  // Register all Scratch endpoints
+  await registerEndpoints(app);
 
-// Register extension source endpoint
-registerExtensionEndpoint(app);
+  // Register extension source endpoint
+  registerExtensionEndpoint(app);
 
-// Log all registered endpoints
-const endpoints = getRegisteredEndpoints();
-console.log("\n📋 Registered Scratch Endpoints:");
-console.log("=".repeat(50));
-endpoints.forEach((ep) => {
-  // Call block function with empty context to get block definition
-  const blockDef = ep.block({});
-  const method = blockDef.blockType === "reporter" ? "GET" : "POST";
-  const auth = ep.noAuth ? " (no auth)" : "";
-  console.log(
-    `  ${method.padEnd(4)} ${ep.endpoint.padEnd(30)} ${
-      blockDef.blockType
-    }${auth}`
+  // Log all registered endpoints
+  const endpoints = getRegisteredEndpoints();
+  console.log("\n📋 Registered Scratch Endpoints:");
+  console.log("=".repeat(50));
+  await Promise.all(
+    endpoints.map(async (ep) => {
+      // Call block function with empty context to get block definition (await since it returns a Promise)
+      const blockDef = await ep.block({});
+      const method = blockDef.blockType === "reporter" ? "GET" : "POST";
+      const auth = ep.noAuth ? " (no auth)" : "";
+      console.log(
+        `  ${method.padEnd(4)} ${ep.endpoint.padEnd(30)} ${
+          blockDef.blockType
+        }${auth}`
+      );
+    })
   );
-});
-console.log("=".repeat(50));
-console.log(`Total: ${endpoints.length} endpoints\n`);
+  console.log("=".repeat(50));
+  console.log(`Total: ${endpoints.length} endpoints\n`);
+})();
 
 const port = process.env.PORT || 3000;
 console.log(`🚀 Server running on http://localhost:${port}`);

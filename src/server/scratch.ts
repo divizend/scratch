@@ -15,11 +15,13 @@ export interface ScratchBlock {
 
 export interface ScratchContext {
   userEmail?: string;
+  validatedBody?: any; // Validated request body (set after validation middleware)
+  // Add any other context properties that should be shared between block and handler
 }
 
 export interface ScratchEndpoint {
   opcode: string;
-  block: (context: ScratchContext) => ScratchBlock;
+  block: (context: ScratchContext) => Promise<ScratchBlock>;
   endpoint: string;
   noAuth?: boolean;
 }
@@ -100,15 +102,15 @@ function validateArguments(block: ScratchBlock) {
 // Automatically generates endpoint path as /api/{opcode}
 // Uses GET for reporter blocks, POST for command blocks
 // Automatically applies JWT auth (unless noAuth is true), argument validation, try-catch, and JSON response
-export function registerScratchEndpoint(
+export async function registerScratchEndpoint(
   app: Hono,
   {
     block,
     handler,
     noAuth = false,
   }: {
-    block: (context: ScratchContext) => ScratchBlock;
-    handler: (c: any) => Promise<any> | any;
+    block: (context: ScratchContext) => Promise<ScratchBlock>;
+    handler: (context: ScratchContext) => Promise<any>;
     noAuth?: boolean;
   }
 ) {
@@ -138,8 +140,8 @@ export function registerScratchEndpoint(
     const context: ScratchContext = { userEmail };
     c.scratchContext = context;
 
-    // Get block definition from function
-    const blockDef = block(context);
+    // Get block definition from function (await since it returns a Promise)
+    const blockDef = await block(context);
     c.scratchBlock = blockDef;
 
     await next();
@@ -153,14 +155,21 @@ export function registerScratchEndpoint(
   // Create validation middleware that uses the block from context
   const validationMiddleware = async (c: any, next: any) => {
     const blockDef = c.scratchBlock;
-    await validateArguments(blockDef)(c, next);
+    // Call validation middleware
+    await validateArguments(blockDef)(c, async () => {
+      // After validation, add validatedBody to context
+      c.scratchContext.validatedBody = c.validatedBody;
+      await next();
+    });
   };
   middlewares.push(validationMiddleware);
 
   // Wrap handler with automatic error handling and JSON response
   const wrappedHandler = async (c: any) => {
     try {
-      const result = await handler(c);
+      // Pass the complete context to handler (includes userEmail and validatedBody)
+      const context = c.scratchContext;
+      const result = await handler(context);
       // If handler returns a Response, use it directly
       if (result instanceof Response) {
         return result;
@@ -179,9 +188,9 @@ export function registerScratchEndpoint(
   middlewares.push(wrappedHandler);
 
   // Get block definition to determine method and endpoint
-  // Use a default context to get the opcode
+  // Use a default context to get the opcode (await since block returns a Promise)
   const defaultContext: ScratchContext = {};
-  const blockDef = block(defaultContext);
+  const blockDef = await block(defaultContext);
   const endpoint = `/api/${blockDef.opcode}`;
   const method = blockDef.blockType === "reporter" ? "get" : "post";
 

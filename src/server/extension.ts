@@ -103,11 +103,13 @@ export function registerExtensionEndpoint(app: Hono) {
 
     // Generate the Scratch extension class
     // Resolve dynamic blocks using the context
-    const resolvedEndpoints = scratchEndpoints.map((ep) => {
-      // Call block function with context to get resolved block
-      const block = ep.block(context);
-      return { ...ep, block };
-    });
+    const resolvedEndpoints = await Promise.all(
+      scratchEndpoints.map(async (ep) => {
+        // Call block function with context to get resolved block (await since it returns a Promise)
+        const block = await ep.block(context);
+        return { ...ep, block };
+      })
+    );
 
     const blocks = resolvedEndpoints.map((ep) => ep.block);
     const methods = resolvedEndpoints

@@ -11,10 +11,10 @@ export function setUniverse(u: Universe | null) {
 }
 
 // Register all Scratch endpoints
-export function registerEndpoints(app: Hono) {
+export async function registerEndpoints(app: Hono) {
   // Email endpoint - queues emails instead of sending immediately
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "queueEmail",
       blockType: "command",
       text: "queue email [from] [to] [subject] [content]",
@@ -37,8 +37,8 @@ export function registerEndpoints(app: Hono) {
         },
       },
     }),
-    handler: (c) => {
-      const { from, to, subject, content } = c.validatedBody;
+    handler: async (context) => {
+      const { from, to, subject, content } = context.validatedBody || {};
       const queuedEmail = emailQueue.add({
         from,
         to,
@@ -54,14 +54,14 @@ export function registerEndpoints(app: Hono) {
   });
 
   // Get available domains (public, for JWT sending)
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "getDomains",
       blockType: "reporter",
       text: "get domains",
       arguments: {},
     }),
-    handler: (c) => {
+    handler: async (context) => {
       if (!universe || !universe.gsuite) {
         return { domains: [], available: false };
       }
@@ -94,8 +94,8 @@ export function registerEndpoints(app: Hono) {
   });
 
   // Send JWT token via email
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "sendJwt",
       blockType: "command",
       text: "send jwt to [email]",
@@ -106,8 +106,8 @@ export function registerEndpoints(app: Hono) {
         },
       },
     }),
-    handler: async (c) => {
-      const { email } = c.validatedBody;
+    handler: async (context) => {
+      const { email } = context.validatedBody || {};
 
       if (!universe || !universe.gsuite) {
         throw new Error("Google Workspace not connected");
@@ -164,28 +164,27 @@ export function registerEndpoints(app: Hono) {
   });
 
   // Get current user email
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "getUser",
       blockType: "reporter",
       text: "get user",
       arguments: {},
     }),
-    handler: async (c) => {
-      const payload = await getJwtPayload(c);
-      return { email: (payload as any)?.email || "Unknown" };
+    handler: async (context) => {
+      return { email: context.userEmail || "Unknown" };
     },
   });
 
   // Health check for googleapis connection
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "getHealth",
       blockType: "reporter",
       text: "get health",
       arguments: {},
     }),
-    handler: async (c) => {
+    handler: async (context) => {
       if (!universe || !universe.gsuite) {
         return {
           status: "error",
@@ -228,35 +227,35 @@ export function registerEndpoints(app: Hono) {
   });
 
   // Get queue
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "getQueue",
       blockType: "reporter",
       text: "get queue",
       arguments: {},
     }),
-    handler: (c) => {
+    handler: async (context) => {
       return { queue: emailQueue.getAll() };
     },
   });
 
   // Clear queue
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "clearQueue",
       blockType: "command",
       text: "clear queue",
       arguments: {},
     }),
-    handler: (c) => {
+    handler: async (context) => {
       emailQueue.clear();
       return { success: true, message: "Queue cleared" };
     },
   });
 
   // Send emails (all or selected)
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "sendEmails",
       blockType: "command",
       text: "send emails [ids]",
@@ -267,12 +266,12 @@ export function registerEndpoints(app: Hono) {
         },
       },
     }),
-    handler: async (c) => {
+    handler: async (context) => {
       if (emailQueue.getIsSending()) {
         throw new Error("Email sending already in progress");
       }
 
-      const { ids } = c.validatedBody;
+      const { ids } = context.validatedBody || {};
       const idsArray =
         !ids || ids === "" || ids === "null" ? null : JSON.parse(ids);
 
@@ -287,8 +286,8 @@ export function registerEndpoints(app: Hono) {
   });
 
   // Remove selected emails
-  registerScratchEndpoint(app, {
-    block: (context) => ({
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
       opcode: "removeEmails",
       blockType: "command",
       text: "remove emails [ids]",
@@ -299,8 +298,8 @@ export function registerEndpoints(app: Hono) {
         },
       },
     }),
-    handler: (c) => {
-      const { ids } = c.validatedBody;
+    handler: async (context) => {
+      const { ids } = context.validatedBody || {};
       const idsArray = JSON.parse(ids);
 
       if (!idsArray || !Array.isArray(idsArray) || idsArray.length === 0) {
