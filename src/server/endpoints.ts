@@ -227,11 +227,11 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "getEmailQueue",
       blockType: "reporter",
-      text: "emailQueue",
+      text: "email queue",
       arguments: {},
     }),
     handler: async (context) => {
-      return { emailQueue: emailQueue.getAll() };
+      return emailQueue.getAll();
     },
   });
 
@@ -240,7 +240,7 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "clearEmailQueue",
       blockType: "command",
-      text: "clear emailQueue",
+      text: "clear email queue",
       arguments: {},
     }),
     handler: async (context) => {
@@ -254,7 +254,7 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "sendAllEmails",
       blockType: "command",
-      text: "send all emails",
+      text: "send all emails in queue",
       arguments: {},
     }),
     handler: async (context) => {
@@ -277,7 +277,7 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "sendSelectedEmails",
       blockType: "command",
-      text: "send selected emails [ids]",
+      text: "send selected emails from queue [ids]",
       arguments: {
         ids: {
           type: "string",
@@ -312,7 +312,7 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "removeEmails",
       blockType: "command",
-      text: "remove emails [ids]",
+      text: "remove emails from queue [ids]",
       arguments: {
         ids: {
           type: "string",

@@ -229,9 +229,9 @@ async function loadQueue() {
       document.getElementById("adminContent").style.display = "none";
       return;
     }
-    const data = await response.json();
-    document.getElementById("queueCount").textContent = data.emailQueue.length;
-    displayEmails(data.emailQueue);
+    const emailQueue = await response.json();
+    document.getElementById("queueCount").textContent = emailQueue.length;
+    displayEmails(emailQueue);
   } catch (error) {
     showStatus("Failed to load email queue: " + error.message, "error");
   }
