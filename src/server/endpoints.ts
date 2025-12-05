@@ -12,7 +12,7 @@ export function setUniverse(u: Universe | null) {
 
 // Register all Scratch endpoints
 export async function registerEndpoints(app: Hono) {
-  // Email endpoint - queues emails instead of sending immediately
+  // Email endpoint - adds emails to email queue instead of sending immediately
   await registerScratchEndpoint(app, {
     block: async (context) => ({
       opcode: "queueEmail",
@@ -58,18 +58,18 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "getDomains",
       blockType: "reporter",
-      text: "get domains",
+      text: "domains",
       arguments: {},
     }),
     handler: async (context) => {
       if (!universe || !universe.gsuite) {
-        return { domains: [], available: false };
+        return [];
       }
 
       try {
         const orgConfigs = (universe.gsuite as any).orgConfigs;
         if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
-          return { domains: [], available: false };
+          return [];
         }
 
         const allDomains: string[] = [];
@@ -81,13 +81,9 @@ export async function registerEndpoints(app: Hono) {
           }
         }
 
-        return { domains: allDomains, available: true };
+        return allDomains;
       } catch (error) {
-        return {
-          domains: [],
-          available: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        };
+        return [];
       }
     },
     noAuth: true,
@@ -168,7 +164,7 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "getUser",
       blockType: "reporter",
-      text: "get user",
+      text: "user",
       arguments: {},
     }),
     handler: async (context) => {
@@ -181,7 +177,7 @@ export async function registerEndpoints(app: Hono) {
     block: async (context) => ({
       opcode: "getHealth",
       blockType: "reporter",
-      text: "get health",
+      text: "health",
       arguments: {},
     }),
     handler: async (context) => {
@@ -226,43 +222,66 @@ export async function registerEndpoints(app: Hono) {
     },
   });
 
-  // Get queue
+  // Get email queue
   await registerScratchEndpoint(app, {
     block: async (context) => ({
-      opcode: "getQueue",
+      opcode: "getEmailQueue",
       blockType: "reporter",
-      text: "get queue",
+      text: "emailQueue",
       arguments: {},
     }),
     handler: async (context) => {
-      return { queue: emailQueue.getAll() };
+      return { emailQueue: emailQueue.getAll() };
     },
   });
 
-  // Clear queue
+  // Clear email queue
   await registerScratchEndpoint(app, {
     block: async (context) => ({
-      opcode: "clearQueue",
+      opcode: "clearEmailQueue",
       blockType: "command",
-      text: "clear queue",
+      text: "clear emailQueue",
       arguments: {},
     }),
     handler: async (context) => {
       emailQueue.clear();
-      return { success: true, message: "Queue cleared" };
+      return { success: true, message: "Email queue cleared" };
     },
   });
 
-  // Send emails (all or selected)
+  // Send all emails
   await registerScratchEndpoint(app, {
     block: async (context) => ({
-      opcode: "sendEmails",
+      opcode: "sendAllEmails",
       blockType: "command",
-      text: "send emails [ids]",
+      text: "send all emails",
+      arguments: {},
+    }),
+    handler: async (context) => {
+      if (emailQueue.getIsSending()) {
+        throw new Error("Email sending already in progress");
+      }
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        throw new Error("RESEND_API_KEY environment variable is not set");
+      }
+
+      const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
+      return await emailQueue.send(null, resendApiKey, resendApiRoot);
+    },
+  });
+
+  // Send selected emails
+  await registerScratchEndpoint(app, {
+    block: async (context) => ({
+      opcode: "sendSelectedEmails",
+      blockType: "command",
+      text: "send selected emails [ids]",
       arguments: {
         ids: {
           type: "string",
-          defaultValue: "null",
+          defaultValue: "[]",
         },
       },
     }),
@@ -272,8 +291,11 @@ export async function registerEndpoints(app: Hono) {
       }
 
       const { ids } = context.validatedBody || {};
-      const idsArray =
-        !ids || ids === "" || ids === "null" ? null : JSON.parse(ids);
+      const idsArray = JSON.parse(ids);
+
+      if (!idsArray || !Array.isArray(idsArray) || idsArray.length === 0) {
+        throw new Error("Invalid or empty ids array");
+      }
 
       const resendApiKey = process.env.RESEND_API_KEY;
       if (!resendApiKey) {

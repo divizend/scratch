@@ -38,15 +38,16 @@ if (token) {
 async function checkDomains() {
   try {
     const response = await fetch("/api/getDomains");
-    const data = await response.json();
+    const domains = await response.json();
 
-    if (data.available && data.domains && data.domains.length > 0) {
+    if (Array.isArray(domains) && domains.length > 0) {
       document.getElementById("jwtSendSection").style.display = "block";
       document.getElementById("allowedDomains").textContent =
-        data.domains.join(", ");
+        domains.join(", ");
       // Setup Enter key handler when section becomes visible
       setupJWTEmailInput();
     } else {
+      // Empty array means no well-functioning domains - hide the section
       document.getElementById("jwtSendSection").style.display = "none";
     }
   } catch (error) {
@@ -214,7 +215,7 @@ async function addEmail() {
 
 async function loadQueue() {
   try {
-    const response = await fetch("/api/getQueue", {
+    const response = await fetch("/api/getEmailQueue", {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -229,17 +230,17 @@ async function loadQueue() {
       return;
     }
     const data = await response.json();
-    document.getElementById("queueCount").textContent = data.queue.length;
-    displayEmails(data.queue);
+    document.getElementById("queueCount").textContent = data.emailQueue.length;
+    displayEmails(data.emailQueue);
   } catch (error) {
-    showStatus("Failed to load queue: " + error.message, "error");
+    showStatus("Failed to load email queue: " + error.message, "error");
   }
 }
 
 function displayEmails(emails) {
   const list = document.getElementById("emailList");
   if (emails.length === 0) {
-    list.innerHTML = "<p>No emails in queue</p>";
+    list.innerHTML = "<p>No emails in email queue</p>";
     return;
   }
   list.innerHTML =
@@ -287,13 +288,13 @@ async function sendAllEmails() {
   showStatus("Sending emails...", "info");
 
   try {
-    const response = await fetch("/api/sendEmails", {
+    const response = await fetch("/api/sendAllEmails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ids: JSON.stringify(null) }), // "null" string means send all
+      body: JSON.stringify({}),
     });
 
     if (response.status === 401) {
@@ -327,7 +328,7 @@ async function sendSelectedEmails() {
   showStatus(`Sending ${selectedIds.length} email(s)...`, "info");
 
   try {
-    const response = await fetch("/api/sendEmails", {
+    const response = await fetch("/api/sendSelectedEmails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -364,7 +365,7 @@ async function removeSelectedEmails() {
 
   if (
     !confirm(
-      `Are you sure you want to remove ${selectedIds.length} email(s) from the queue?`
+      `Are you sure you want to remove ${selectedIds.length} email(s) from the email queue?`
     )
   ) {
     return;
@@ -403,7 +404,7 @@ async function removeSelectedEmails() {
 }
 
 async function clearQueue() {
-  if (!confirm("Are you sure you want to clear the entire queue?")) {
+  if (!confirm("Are you sure you want to clear the entire email queue?")) {
     return;
   }
 
@@ -411,7 +412,7 @@ async function clearQueue() {
   btn.disabled = true;
 
   try {
-    const response = await fetch("/api/clearQueue", {
+    const response = await fetch("/api/clearEmailQueue", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -423,13 +424,13 @@ async function clearQueue() {
 
     const data = await response.json();
     if (data.success) {
-      // showStatus('Queue cleared', 'success');
+      // showStatus('Email queue cleared', 'success');
     } else {
       showStatus("Error: " + (data.error || "Unknown error"), "error");
     }
     loadQueue();
   } catch (error) {
-    showStatus("Failed to clear queue: " + error.message, "error");
+    showStatus("Failed to clear email queue: " + error.message, "error");
   } finally {
     btn.disabled = false;
   }
