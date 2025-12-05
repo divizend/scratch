@@ -5,7 +5,7 @@ import { marked } from "marked";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { jwtVerify, SignJWT } from "jose";
-import { Universe, Resend } from "./src";
+import { Universe, emailQueue, QueuedEmail, Resend } from "./src";
 
 // Get the directory where this file is located
 const __filename = fileURLToPath(import.meta.url);
@@ -24,16 +24,6 @@ let universe: Universe | null = null;
     console.error("Failed to initialize Universe:", error);
   }
 })();
-
-// Email queue storage
-interface QueuedEmail {
-  id: string;
-  from: string;
-  to: string;
-  subject: string;
-  content: string;
-  queuedAt: number;
-}
 
 // Scratch extension block definition
 interface ScratchBlock {
@@ -54,9 +44,6 @@ interface ScratchEndpoint {
   block: ScratchBlock;
   endpoint: string;
 }
-
-const emailQueue: QueuedEmail[] = [];
-let isSending = false;
 
 // Scratch extension configuration
 const HOSTED_AT = process.env.HOSTED_AT || "scratch.divizend.ai";
@@ -374,16 +361,12 @@ registerScratchEndpoint({
     const { from, to, subject, content } = c.validatedBody;
 
     // Add to queue instead of sending immediately
-    const queuedEmail: QueuedEmail = {
-      id: crypto.randomUUID(),
+    const queuedEmail = emailQueue.add({
       from,
       to,
       subject,
       content,
-      queuedAt: Date.now(),
-    };
-
-    emailQueue.push(queuedEmail);
+    });
 
     return {
       success: true,
@@ -574,30 +557,22 @@ app.get("/admin/api/health", jwtAuth, async (c) => {
 
 // Admin API: Get queue
 app.get("/admin/api/queue", jwtAuth, async (c) => {
-  return c.json({ queue: emailQueue });
+  return c.json({ queue: emailQueue.getAll() });
 });
 
 // Admin API: Clear queue
 app.post("/admin/api/queue/clear", jwtAuth, async (c) => {
-  emailQueue.length = 0;
+  emailQueue.clear();
   return c.json({ success: true, message: "Queue cleared" });
 });
 
 // Admin API: Send emails (all or selected)
 app.post("/admin/api/queue/send", jwtAuth, async (c) => {
-  if (isSending) {
+  if (emailQueue.getIsSending()) {
     return c.json({ error: "Email sending already in progress" }, 409);
   }
 
   const { ids } = await c.req.json();
-  const emailsToSend =
-    ids === null
-      ? emailQueue
-      : emailQueue.filter((email) => ids.includes(email.id));
-
-  if (emailsToSend.length === 0) {
-    return c.json({ success: true, sent: 0, message: "No emails to send" });
-  }
 
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
@@ -608,51 +583,18 @@ app.post("/admin/api/queue/send", jwtAuth, async (c) => {
   }
 
   const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
-  const resend = new Resend(resendApiKey, resendApiRoot);
 
-  isSending = true;
-  let sent = 0;
-  let errors = 0;
-
-  // Send emails with rate limiting (100ms delay between emails to avoid rate limits)
-  for (let i = 0; i < emailsToSend.length; i++) {
-    const email = emailsToSend[i];
-    try {
-      const response = await resend.sendEmail({
-        from: email.from,
-        to: email.to,
-        subject: email.subject,
-        html: `<p>${email.content}</p>`,
-      });
-
-      if (response.ok) {
-        sent++;
-        // Remove sent email from queue
-        const index = emailQueue.findIndex((e) => e.id === email.id);
-        if (index !== -1) {
-          emailQueue.splice(index, 1);
-        }
-      } else {
-        errors++;
-      }
-
-      // Rate limiting: wait 100ms between emails (allows up to 10 emails/second)
-      if (i < emailsToSend.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    } catch (error) {
-      errors++;
-    }
+  try {
+    const result = await emailQueue.send(ids, resendApiKey, resendApiRoot);
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      500
+    );
   }
-
-  isSending = false;
-
-  return c.json({
-    success: true,
-    sent,
-    errors,
-    message: `Sent ${sent} email(s)${errors > 0 ? `, ${errors} error(s)` : ""}`,
-  });
 });
 
 // Admin API: Remove selected emails
@@ -663,11 +605,7 @@ app.post("/admin/api/queue/remove", jwtAuth, async (c) => {
     return c.json({ error: "Invalid or empty ids array" }, 400);
   }
 
-  const initialLength = emailQueue.length;
-  const filtered = emailQueue.filter((email) => !ids.includes(email.id));
-  emailQueue.length = 0;
-  emailQueue.push(...filtered);
-  const removed = initialLength - emailQueue.length;
+  const removed = emailQueue.removeByIds(ids);
 
   return c.json({
     success: true,
