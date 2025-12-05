@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { marked } from "marked";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+// Get the directory where this file is located
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = __dirname;
 
 const app = new Hono();
 
@@ -28,7 +35,8 @@ app.use("*", async (c, next) => {
 // Serve README.md from root (formatted as HTML)
 app.get("/", async (c) => {
   try {
-    const readme = await Bun.file("./README.md").text();
+    const readmePath = join(projectRoot, "README.md");
+    const readme = await Bun.file(readmePath).text();
     const html = await marked(readme);
     const styledHtml = `
 <!DOCTYPE html>
@@ -108,7 +116,7 @@ app.post("/api/send-email", async (c) => {
 });
 
 // Serve static files from public directory
-app.use("/*", serveStatic({ root: "./public" }));
+app.use("/*", serveStatic({ root: join(projectRoot, "public") }));
 
 const port = process.env.PORT || 3000;
 console.log(`Server running on http://localhost:${port}`);
