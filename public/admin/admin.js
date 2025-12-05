@@ -37,7 +37,7 @@ if (token) {
 
 async function checkDomains() {
   try {
-    const response = await fetch("/admin/api/domains");
+    const response = await fetch("/api/getDomains");
     const data = await response.json();
 
     if (data.available && data.domains && data.domains.length > 0) {
@@ -67,7 +67,7 @@ async function sendJWT() {
   showStatus("Sending JWT token...", "info", "jwtSendStatus");
 
   try {
-    const response = await fetch("/admin/api/send-jwt", {
+    const response = await fetch("/api/sendJwt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -110,7 +110,8 @@ async function authenticate() {
 
   // Get user info
   try {
-    const response = await fetch("/admin/api/user", {
+    const response = await fetch("/api/getUser", {
+      method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
     if (response.status === 401) {
@@ -185,9 +186,12 @@ async function addEmail() {
   btn.disabled = true;
 
   try {
-    const response = await fetch("/api/queue-email", {
+    const response = await fetch("/api/queueEmail", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ from, to, subject, content }),
     });
 
@@ -210,7 +214,8 @@ async function addEmail() {
 
 async function loadQueue() {
   try {
-    const response = await fetch("/admin/api/queue", {
+    const response = await fetch("/api/getQueue", {
+      method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
     if (response.status === 401) {
@@ -282,13 +287,13 @@ async function sendAllEmails() {
   showStatus("Sending emails...", "info");
 
   try {
-    const response = await fetch("/admin/api/queue/send", {
+    const response = await fetch("/api/sendEmails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ids: null }), // null means send all
+      body: JSON.stringify({ ids: JSON.stringify(null) }), // "null" string means send all
     });
 
     if (response.status === 401) {
@@ -322,13 +327,13 @@ async function sendSelectedEmails() {
   showStatus(`Sending ${selectedIds.length} email(s)...`, "info");
 
   try {
-    const response = await fetch("/admin/api/queue/send", {
+    const response = await fetch("/api/sendEmails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ids: selectedIds }),
+      body: JSON.stringify({ ids: JSON.stringify(selectedIds) }),
     });
 
     if (response.status === 401) {
@@ -369,13 +374,13 @@ async function removeSelectedEmails() {
   btn.disabled = true;
 
   try {
-    const response = await fetch("/admin/api/queue/remove", {
+    const response = await fetch("/api/removeEmails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ids: selectedIds }),
+      body: JSON.stringify({ ids: JSON.stringify(selectedIds) }),
     });
 
     if (response.status === 401) {
@@ -406,7 +411,7 @@ async function clearQueue() {
   btn.disabled = true;
 
   try {
-    const response = await fetch("/admin/api/queue/clear", {
+    const response = await fetch("/api/clearQueue", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -432,7 +437,8 @@ async function clearQueue() {
 
 async function loadHealthCheck() {
   try {
-    const response = await fetch("/admin/api/health", {
+    const response = await fetch("/api/getHealth", {
+      method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
 
