@@ -13,9 +13,13 @@ export interface ScratchBlock {
   };
 }
 
+export interface ScratchContext {
+  userEmail?: string;
+}
+
 export interface ScratchEndpoint {
   opcode: string;
-  block: ScratchBlock;
+  block: (context: ScratchContext) => ScratchBlock;
   endpoint: string;
   noAuth?: boolean;
 }
@@ -103,16 +107,55 @@ export function registerScratchEndpoint(
     handler,
     noAuth = false,
   }: {
-    block: ScratchBlock;
+    block: (context: ScratchContext) => ScratchBlock;
     handler: (c: any) => Promise<any> | any;
     noAuth?: boolean;
   }
 ) {
-  const endpoint = `/api/${block.opcode}`;
-  scratchEndpoints.push({ opcode: block.opcode, block, endpoint, noAuth });
+  // Build middleware array conditionally
+  const middlewares: Array<(c: any, next?: any) => Promise<any> | any> = [];
 
-  // Determine HTTP method based on block type
-  const method = block.blockType === "reporter" ? "get" : "post";
+  // Create context extraction middleware
+  const contextMiddleware = async (c: any, next: any) => {
+    // Extract user email from JWT if available (always try, even if noAuth is true)
+    // Fail silently if token is invalid or missing
+    let userEmail: string | undefined;
+    try {
+      const authHeader = c.req.header("Authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        const { validateJwtToken } = await import("./auth");
+        const payload = await validateJwtToken(token);
+        if (payload) {
+          userEmail = (payload as any)?.email;
+        }
+      }
+    } catch (error) {
+      // Ignore errors, userEmail will remain undefined
+    }
+
+    // Create context
+    const context: ScratchContext = { userEmail };
+    c.scratchContext = context;
+
+    // Get block definition from function
+    const blockDef = block(context);
+    c.scratchBlock = blockDef;
+
+    await next();
+  };
+
+  if (!noAuth) {
+    middlewares.push(jwtAuth);
+  }
+  middlewares.push(contextMiddleware);
+
+  // Create validation middleware that uses the block from context
+  const validationMiddleware = async (c: any, next: any) => {
+    const blockDef = c.scratchBlock;
+    await validateArguments(blockDef)(c, next);
+  };
+  middlewares.push(validationMiddleware);
 
   // Wrap handler with automatic error handling and JSON response
   const wrappedHandler = async (c: any) => {
@@ -133,14 +176,22 @@ export function registerScratchEndpoint(
       );
     }
   };
-
-  // Build middleware array conditionally
-  const middlewares: Array<(c: any, next?: any) => Promise<any> | any> = [];
-  if (!noAuth) {
-    middlewares.push(jwtAuth);
-  }
-  middlewares.push(validateArguments(block));
   middlewares.push(wrappedHandler);
+
+  // Get block definition to determine method and endpoint
+  // Use a default context to get the opcode
+  const defaultContext: ScratchContext = {};
+  const blockDef = block(defaultContext);
+  const endpoint = `/api/${blockDef.opcode}`;
+  const method = blockDef.blockType === "reporter" ? "get" : "post";
+
+  // Store endpoint info - store the block function so it can be resolved with user context later
+  scratchEndpoints.push({
+    opcode: blockDef.opcode,
+    block: block,
+    endpoint,
+    noAuth,
+  });
 
   // Register the route with Hono
   app[method](endpoint, ...middlewares);

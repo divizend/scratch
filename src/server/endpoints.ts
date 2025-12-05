@@ -15,7 +15,7 @@ export function setUniverse(u: Universe | null) {
 export function registerEndpoints(app: Hono) {
   // Email endpoint - queues emails instead of sending immediately
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "queueEmail",
       blockType: "command",
       text: "queue email [from] [to] [subject] [content]",
@@ -26,7 +26,7 @@ export function registerEndpoints(app: Hono) {
         },
         to: {
           type: "string",
-          defaultValue: "julian.nalenz@divizend.com",
+          defaultValue: context.userEmail ?? "julian.nalenz@divizend.com",
         },
         subject: {
           type: "string",
@@ -37,7 +37,7 @@ export function registerEndpoints(app: Hono) {
           defaultValue: "This email was sent from a Scratch block!",
         },
       },
-    },
+    }),
     handler: (c) => {
       const { from, to, subject, content } = c.validatedBody;
       const queuedEmail = emailQueue.add({
@@ -56,12 +56,12 @@ export function registerEndpoints(app: Hono) {
 
   // Get available domains (public, for JWT sending)
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "getDomains",
       blockType: "reporter",
       text: "get domains",
       arguments: {},
-    },
+    }),
     handler: (c) => {
       if (!universe || !universe.gsuite) {
         return { domains: [], available: false };
@@ -96,17 +96,17 @@ export function registerEndpoints(app: Hono) {
 
   // Send JWT token via email
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "sendJwt",
       blockType: "command",
       text: "send jwt to [email]",
       arguments: {
         email: {
           type: "string",
-          defaultValue: "",
+          defaultValue: context.userEmail ?? "",
         },
       },
-    },
+    }),
     handler: async (c) => {
       const { email } = c.validatedBody;
 
@@ -176,12 +176,12 @@ export function registerEndpoints(app: Hono) {
 
   // Get current user email
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "getUser",
       blockType: "reporter",
       text: "get user",
       arguments: {},
-    },
+    }),
     handler: async (c) => {
       const payload = await getJwtPayload(c);
       return { email: (payload as any)?.email || "Unknown" };
@@ -190,12 +190,12 @@ export function registerEndpoints(app: Hono) {
 
   // Health check for googleapis connection
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "getHealth",
       blockType: "reporter",
       text: "get health",
       arguments: {},
-    },
+    }),
     handler: async (c) => {
       if (!universe || !universe.gsuite) {
         return {
@@ -240,12 +240,12 @@ export function registerEndpoints(app: Hono) {
 
   // Get queue
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "getQueue",
       blockType: "reporter",
       text: "get queue",
       arguments: {},
-    },
+    }),
     handler: (c) => {
       return { queue: emailQueue.getAll() };
     },
@@ -253,12 +253,12 @@ export function registerEndpoints(app: Hono) {
 
   // Clear queue
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "clearQueue",
       blockType: "command",
       text: "clear queue",
       arguments: {},
-    },
+    }),
     handler: (c) => {
       emailQueue.clear();
       return { success: true, message: "Queue cleared" };
@@ -267,7 +267,7 @@ export function registerEndpoints(app: Hono) {
 
   // Send emails (all or selected)
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "sendEmails",
       blockType: "command",
       text: "send emails [ids]",
@@ -277,7 +277,7 @@ export function registerEndpoints(app: Hono) {
           defaultValue: "null",
         },
       },
-    },
+    }),
     handler: async (c) => {
       if (emailQueue.getIsSending()) {
         throw new Error("Email sending already in progress");
@@ -299,7 +299,7 @@ export function registerEndpoints(app: Hono) {
 
   // Remove selected emails
   registerScratchEndpoint(app, {
-    block: {
+    block: (context) => ({
       opcode: "removeEmails",
       blockType: "command",
       text: "remove emails [ids]",
@@ -309,7 +309,7 @@ export function registerEndpoints(app: Hono) {
           defaultValue: "[]",
         },
       },
-    },
+    }),
     handler: (c) => {
       const { ids } = c.validatedBody;
       const idsArray = JSON.parse(ids);

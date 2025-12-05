@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { validateJwtToken } from "./auth";
-import { scratchEndpoints } from "./scratch";
+import { scratchEndpoints, ScratchContext } from "./scratch";
 
 // Helper function to convert email to hyphenated name (e.g., "julian.nalenz@divizend.com" -> "julian-nalenz")
 function emailToHyphenatedName(email: string): string {
@@ -98,9 +98,19 @@ export function registerExtensionEndpoint(app: Hono) {
     // Determine the base URL for this request
     const baseUrl = getBaseUrl(c);
 
+    // Create context with user email
+    const context: ScratchContext = { userEmail: email };
+
     // Generate the Scratch extension class
-    const blocks = scratchEndpoints.map((ep) => ep.block);
-    const methods = scratchEndpoints
+    // Resolve dynamic blocks using the context
+    const resolvedEndpoints = scratchEndpoints.map((ep) => {
+      // Call block function with context to get resolved block
+      const block = ep.block(context);
+      return { ...ep, block };
+    });
+
+    const blocks = resolvedEndpoints.map((ep) => ep.block);
+    const methods = resolvedEndpoints
       .map((ep) => {
         const params = Object.keys(ep.block.arguments);
         const paramList = params.join(", ");
