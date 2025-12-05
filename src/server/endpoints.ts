@@ -2,8 +2,7 @@ import { Hono } from "hono";
 import { registerScratchEndpoint } from "./scratch";
 import { emailQueue } from "../queue";
 import { Universe, Resend } from "../";
-import { getJwtPayload } from "./auth";
-import { SignJWT } from "jose";
+import { getJwtPayload, signJwtToken } from "./auth";
 
 let universe: Universe | null = null;
 
@@ -137,17 +136,7 @@ export function registerEndpoints(app: Hono) {
       }
 
       // Generate JWT token
-      const JWT_SECRET = process.env.WEB_UI_JWT_SECRET || "";
-      if (!JWT_SECRET) {
-        throw new Error("JWT secret not configured");
-      }
-
-      const JWT_SECRET_KEY = new TextEncoder().encode(JWT_SECRET);
-      const jwt = await new SignJWT({ email })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime("30d")
-        .sign(JWT_SECRET_KEY);
+      const jwt = await signJwtToken({ email });
 
       // Send email via Resend
       const resendApiKey = process.env.RESEND_API_KEY;

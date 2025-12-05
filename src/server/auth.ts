@@ -1,4 +1,4 @@
-import { jwtVerify } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 
 // JWT secret from environment
 const JWT_SECRET = process.env.WEB_UI_JWT_SECRET || "";
@@ -32,6 +32,24 @@ export const getJwtPayload = async (c: any) => {
   const token = authHeader.substring(7);
   return await validateJwtToken(token);
 };
+
+// Helper to sign/create a JWT token
+export async function signJwtToken(
+  payload: { email: string },
+  expirationTime: string = "30d"
+): Promise<string> {
+  if (!JWT_SECRET_KEY) {
+    throw new Error("JWT secret not configured");
+  }
+
+  const jwt = await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(expirationTime)
+    .sign(JWT_SECRET_KEY);
+
+  return jwt;
+}
 
 // JWT authentication middleware
 export const jwtAuth = async (c: any, next: any) => {
