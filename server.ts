@@ -177,7 +177,17 @@ app.get("/", async (c) => {
   try {
     const readmePath = join(projectRoot, "README.md");
     const readme = await Bun.file(readmePath).text();
-    const html = await marked(readme);
+    let html = await marked(readme);
+
+    // Add target="_blank" and rel="noopener noreferrer" to all links
+    html = html.replace(/<a\s+([^>]*?)>/gi, (match, attributes) => {
+      // Check if target is already set
+      if (!/target\s*=/i.test(attributes)) {
+        attributes += ' target="_blank" rel="noopener noreferrer"';
+      }
+      return `<a ${attributes}>`;
+    });
+
     const styledHtml = `
 <!DOCTYPE html>
 <html>
