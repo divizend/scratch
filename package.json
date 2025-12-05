@@ -7,9 +7,11 @@
   },
   "type": "module",
   "dependencies": {
-    "hono": "^4.10.7"
+    "hono": "^4.10.7",
+    "marked": "^12.0.0"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.3",
     "@types/node": "^24.10.1"
   }
 }

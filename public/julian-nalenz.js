@@ -25,7 +25,7 @@ class DivizendJulianNalenz {
             },
             content: {
               type: "string",
-              defaultValue: "Hello from a Scratch block!",
+              defaultValue: "This email was sent from a Scratch block!",
             },
             resendApiKey: {
               type: "string",

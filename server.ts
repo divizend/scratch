@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
+import { marked } from "marked";
 
 const app = new Hono();
 
@@ -22,6 +23,46 @@ app.use("*", async (c, next) => {
   c.header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   c.header("Pragma", "no-cache");
   c.header("Expires", "0");
+});
+
+// Serve README.md from root (formatted as HTML)
+app.get("/", async (c) => {
+  try {
+    const readme = await Bun.file("./README.md").text();
+    const html = await marked(readme);
+    const styledHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>README</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #333;
+    }
+    h1 { border-bottom: 2px solid #eaecef; padding-bottom: 0.3em; }
+    h2 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; margin-top: 24px; }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background-color: #f6f8fa; padding: 2px 4px; border-radius: 3px; font-size: 85%; }
+    pre { background-color: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    pre code { background-color: transparent; padding: 0; }
+  </style>
+</head>
+<body>
+  ${html}
+</body>
+</html>`;
+    return c.html(styledHtml);
+  } catch (error) {
+    return c.text("README.md not found", 404);
+  }
 });
 
 // Email endpoint
