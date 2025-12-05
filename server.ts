@@ -64,9 +64,15 @@ const endpoints = getRegisteredEndpoints();
 console.log("\n📋 Registered Scratch Endpoints:");
 console.log("=".repeat(50));
 endpoints.forEach((ep) => {
-  const method = ep.block.blockType === "reporter" ? "GET" : "POST";
+  // Call block function with empty context to get block definition
+  const blockDef = ep.block({});
+  const method = blockDef.blockType === "reporter" ? "GET" : "POST";
   const auth = ep.noAuth ? " (no auth)" : "";
-  console.log(`  ${method.padEnd(4)} ${ep.endpoint.padEnd(30)} ${ep.block.blockType}${auth}`);
+  console.log(
+    `  ${method.padEnd(4)} ${ep.endpoint.padEnd(30)} ${
+      blockDef.blockType
+    }${auth}`
+  );
 });
 console.log("=".repeat(50));
 console.log(`Total: ${endpoints.length} endpoints\n`);
