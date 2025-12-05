@@ -2,12 +2,11 @@
 
 ## Short links
 
-- [Try it out in Scratch](https://sheeptester.github.io/scratch-gui/?url=https://scratch.divizend.ai/julian-nalenz.js)
 - [Admin interface](/admin)
 
 ## Introduction
 
-The code from this website can be run by visiting the following website: https://sheeptester.github.io/scratch-gui/?url=https://scratch.divizend.ai/julian-nalenz.js
+The code from this website can be run by visiting the [admin interface](/admin) and clicking on "Open in Scratch".
 
 The web server defined in this repository ([github.com/divizend/scratch](https://github.com/divizend/scratch)) is currently deployed at [scratch.divizend.ai](https://scratch.divizend.ai).
 
