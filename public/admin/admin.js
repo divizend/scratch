@@ -119,9 +119,9 @@ async function authenticate() {
       showStatus("Authentication failed", "error", "authStatus");
       return;
     }
-    const userData = await response.json();
-    document.getElementById("userEmail").textContent =
-      userData.email || "Unknown";
+    // getUser returns plain text (email string), not JSON
+    const userEmail = await response.text();
+    document.getElementById("userEmail").textContent = userEmail || "Unknown";
   } catch (error) {
     console.error("Failed to get user info:", error);
   }
