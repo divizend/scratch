@@ -266,4 +266,49 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       }
     },
   },
+
+  // Get array length
+  {
+    block: async (context) => ({
+      opcode: "getArrayLength",
+      blockType: "reporter",
+      text: "length of array [array]",
+      schema: {
+        array: {
+          type: "string",
+          default: "[]",
+          description: "JSON array string",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { array } = context.validatedBody!;
+
+      try {
+        // Parse the array JSON string
+        let parsedArray: any;
+        try {
+          parsedArray = JSON.parse(array);
+        } catch (parseError) {
+          throw new Error(
+            `Invalid JSON array: ${
+              parseError instanceof Error ? parseError.message : "Unknown error"
+            }`
+          );
+        }
+
+        // Check if it's actually an array
+        if (!Array.isArray(parsedArray)) {
+          throw new Error("Input is not an array");
+        }
+
+        // Return the length as a stringified number
+        return String(parsedArray.length);
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "Failed to get array length"
+        );
+      }
+    },
+  },
 ];
