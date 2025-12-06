@@ -21,6 +21,13 @@ export interface ResendResponse {
   text: string;
 }
 
+export interface ResendDomain {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
+}
+
 export class Resend {
   private apiKey: string;
   private apiRoot: string;
@@ -34,6 +41,35 @@ export class Resend {
   constructor(apiKey: string, apiRoot: string = "api.resend.com") {
     this.apiKey = apiKey;
     this.apiRoot = apiRoot;
+  }
+
+  /**
+   * Gets all domains from Resend API
+   *
+   * @returns Promise<string[]> - Array of domain names
+   */
+  async getDomains(): Promise<string[]> {
+    const url = `https://${this.apiRoot}/domains`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to fetch Resend domains: ${text}`);
+    }
+
+    const data = await response.json();
+    const domains: ResendDomain[] = data.data || [];
+
+    // Extract domain names and filter by verified status
+    return domains
+      .filter((domain) => domain.status === "verified")
+      .map((domain) => domain.name);
   }
 
   /**

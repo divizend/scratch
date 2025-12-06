@@ -1,9 +1,11 @@
 import { ScratchEndpointDefinition } from "../scratch";
 import { emailQueue } from "../../queue";
+import { Resend } from "../../";
+import { getUniverse } from "../universe";
 
 // Email queue endpoints
 export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
-  // Email endpoint - adds emails to email queue instead of sending immediately
+  // Email endpoint - adds emails to email queue (Resend) or sends immediately (Gmail)
   {
     block: async (context) => ({
       opcode: "queueEmail",
@@ -30,12 +32,70 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     }),
     handler: async (context) => {
       const { from, to, subject, content } = context.validatedBody || {};
+
+      if (!from || !to || !subject || !content) {
+        throw new Error("from, to, subject, and content are required");
+      }
+
+      // Extract domain from "from" email address
+      const fromDomain = from.split("@")[1];
+      if (!fromDomain) {
+        throw new Error(`Invalid email address: ${from}`);
+      }
+
+      // Get Resend domains
+      let resendDomains: string[] = [];
+      try {
+        const resendApiKey = process.env.RESEND_API_KEY;
+        if (resendApiKey) {
+          const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
+          const resend = new Resend(resendApiKey, resendApiRoot);
+          resendDomains = await resend.getDomains();
+        }
+      } catch (error) {
+        // If Resend API fails, continue with empty array
+        console.warn("Failed to fetch Resend domains:", error);
+      }
+
+      // Get Google Workspace domains
+      let gsuiteDomains: string[] = [];
+      const universe = getUniverse();
+      if (universe && universe.gsuite) {
+        try {
+          const orgConfigs = (universe.gsuite as any).orgConfigs;
+          if (orgConfigs && Object.keys(orgConfigs).length > 0) {
+            for (const orgConfig of Object.values(orgConfigs) as any[]) {
+              for (const domain of orgConfig.domains) {
+                if (domain.domainName) {
+                  gsuiteDomains.push(domain.domainName);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // If GSuite domain fetch fails, continue with empty array
+          console.warn("Failed to fetch GSuite domains:", error);
+        }
+      }
+
+      // Validate domain is recognized
+      const isResendDomain = resendDomains.includes(fromDomain);
+      const isGsuiteDomain = gsuiteDomains.includes(fromDomain);
+
+      if (!isResendDomain && !isGsuiteDomain) {
+        throw new Error(
+          `Unrecognized sender domain: ${fromDomain}. Domain must be either a verified Resend domain or a Google Workspace domain.`
+        );
+      }
+
+      // Queue the email - routing will happen when sending
       const queuedEmail = emailQueue.add({
         from,
         to,
         subject,
         content,
       });
+
       return {
         success: true,
         id: queuedEmail.id,

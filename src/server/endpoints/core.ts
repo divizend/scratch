@@ -1,12 +1,7 @@
 import { ScratchEndpointDefinition } from "../scratch";
-import { Universe, Resend } from "../../";
+import { Resend } from "../../";
 import { signJwtToken } from "../auth";
-
-let universe: Universe | null = null;
-
-export function setUniverse(u: Universe | null) {
-  universe = u;
-}
+import { getUniverse } from "../universe";
 
 // Core and authentication endpoints
 export const coreEndpoints: ScratchEndpointDefinition[] = [
@@ -19,6 +14,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite) {
         return [];
       }
@@ -61,6 +57,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     }),
     handler: async (context) => {
       const { email } = context.validatedBody || {};
+      const universe = getUniverse();
 
       if (!universe || !universe.gsuite) {
         throw new Error("Google Workspace not connected");
@@ -138,6 +135,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite) {
         return {
           status: "error",
@@ -189,6 +187,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         return [];
       }
@@ -217,6 +216,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         return [];
       }
@@ -253,6 +253,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         return [];
       }
@@ -285,52 +286,6 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     },
   },
 
-  // Send Gmail message
-  {
-    block: async (context) => ({
-      opcode: "sendGmail",
-      blockType: "command",
-      text: "send Gmail message to [to] subject [subject] body [body]",
-      arguments: {
-        to: {
-          type: "string",
-          defaultValue: context.userEmail ?? "",
-        },
-        subject: {
-          type: "string",
-          defaultValue: "Hello from Scratch!",
-        },
-        body: {
-          type: "string",
-          defaultValue: "This email was sent from a Scratch block.",
-        },
-      },
-    }),
-    handler: async (context) => {
-      if (!universe || !universe.gsuite || !context.userEmail) {
-        throw new Error(
-          "Google Workspace not connected or user not authenticated"
-        );
-      }
-
-      const { to, subject, body } = context.validatedBody || {};
-      if (!to || !subject || !body) {
-        throw new Error("to, subject, and body are required");
-      }
-
-      try {
-        const gsuiteUser = universe.gsuite.user(context.userEmail);
-        const gmail = gsuiteUser.gmail();
-        await gmail.send({ to, subject, body });
-        return { success: true, message: "Gmail sent successfully" };
-      } catch (error) {
-        throw new Error(
-          error instanceof Error ? error.message : "Failed to send Gmail"
-        );
-      }
-    },
-  },
-
   // Drive endpoints
   // Open a Drive file
   {
@@ -346,6 +301,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         throw new Error(
           "Google Workspace not connected or user not authenticated"
@@ -396,6 +352,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         throw new Error(
           "Google Workspace not connected or user not authenticated"
@@ -443,6 +400,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         throw new Error(
           "Google Workspace not connected or user not authenticated"
@@ -485,6 +443,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
+      const universe = getUniverse();
       if (!universe || !universe.gsuite || !context.userEmail) {
         throw new Error(
           "Google Workspace not connected or user not authenticated"
