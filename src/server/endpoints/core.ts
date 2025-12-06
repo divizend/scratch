@@ -15,7 +15,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "getDomains",
       blockType: "reporter",
-      text: "domains",
+      text: "workspace domains",
       arguments: {},
     }),
     handler: async (context) => {
@@ -51,7 +51,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "sendJwt",
       blockType: "command",
-      text: "send jwt to [email]",
+      text: "send login token to [email]",
       arguments: {
         email: {
           type: "string",
@@ -121,7 +121,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "getUser",
       blockType: "reporter",
-      text: "user",
+      text: "my email",
       arguments: {},
     }),
     handler: async (context) => {
@@ -134,7 +134,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "getHealth",
       blockType: "reporter",
-      text: "health",
+      text: "workspace status",
       arguments: {},
     }),
     handler: async (context) => {
@@ -185,7 +185,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "getUsers",
       blockType: "reporter",
-      text: "users",
+      text: "workspace users",
       arguments: {},
     }),
     handler: async (context) => {
@@ -213,7 +213,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "getGmailLabels",
       blockType: "reporter",
-      text: "gmail labels",
+      text: "my email labels",
       arguments: {},
     }),
     handler: async (context) => {
@@ -240,7 +240,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "listGmailMessages",
       blockType: "reporter",
-      text: "gmail messages [label] [limit]",
+      text: "my emails [label] [limit]",
       arguments: {
         label: {
           type: "string",
@@ -290,7 +290,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "sendGmail",
       blockType: "command",
-      text: "send gmail [to] [subject] [body]",
+      text: "send email [to] [subject] [body]",
       arguments: {
         to: {
           type: "string",
@@ -337,7 +337,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "openDriveFile",
       blockType: "reporter",
-      text: "open drive file [fileId]",
+      text: "open file [fileId]",
       arguments: {
         fileId: {
           type: "string",
@@ -379,7 +379,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "copyDriveFile",
       blockType: "command",
-      text: "copy drive file [sourceFileId] [destFolderId] [name]",
+      text: "copy file [sourceFileId] to [destFolderId] as [name]",
       arguments: {
         sourceFileId: {
           type: "string",
@@ -434,7 +434,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "openDocument",
       blockType: "reporter",
-      text: "open document [documentId]",
+      text: "open doc [documentId]",
       arguments: {
         documentId: {
           type: "string",
@@ -476,7 +476,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "openSpreadsheet",
       blockType: "reporter",
-      text: "open spreadsheet [spreadsheetId]",
+      text: "open sheet [spreadsheetId]",
       arguments: {
         spreadsheetId: {
           type: "string",

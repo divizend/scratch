@@ -8,7 +8,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "queueEmail",
       blockType: "command",
-      text: "queue email [from] [to] [subject] [content]",
+      text: "add email [from] [to] [subject] [content]",
       arguments: {
         from: {
           type: "string",
@@ -49,7 +49,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "getEmailQueue",
       blockType: "reporter",
-      text: "email queue",
+      text: "queued emails",
       arguments: {},
     }),
     handler: async (context) => {
@@ -62,7 +62,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "clearEmailQueue",
       blockType: "command",
-      text: "clear email queue",
+      text: "clear queue",
       arguments: {},
     }),
     handler: async (context) => {
@@ -76,7 +76,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "sendAllEmails",
       blockType: "command",
-      text: "send all emails in queue",
+      text: "send all queued emails",
       arguments: {},
     }),
     handler: async (context) => {
@@ -99,7 +99,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "sendSelectedEmails",
       blockType: "command",
-      text: "send selected emails from queue [ids]",
+      text: "send emails [ids]",
       arguments: {
         ids: {
           type: "string",
@@ -134,7 +134,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "removeEmails",
       blockType: "command",
-      text: "remove emails from queue [ids]",
+      text: "remove emails [ids]",
       arguments: {
         ids: {
           type: "string",
