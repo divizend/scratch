@@ -2,6 +2,7 @@ import { ScratchEndpointDefinition } from "../scratch";
 import { signJwtToken } from "../auth";
 import { UniverseModule } from "../../core";
 import Mustache from "mustache";
+import { JSONPath } from "jsonpath-plus";
 
 // Core and authentication endpoints
 export const coreEndpoints: ScratchEndpointDefinition[] = [
@@ -179,7 +180,11 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
         try {
           parsedData = JSON.parse(data);
         } catch (parseError) {
-          throw new Error(`Invalid JSON data: ${parseError instanceof Error ? parseError.message : "Unknown error"}`);
+          throw new Error(
+            `Invalid JSON data: ${
+              parseError instanceof Error ? parseError.message : "Unknown error"
+            }`
+          );
         }
 
         // Render the template using Mustache
@@ -187,9 +192,76 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
         return rendered;
       } catch (error) {
         throw new Error(
+          error instanceof Error ? error.message : "Failed to render template"
+        );
+      }
+    },
+  },
+
+  // JSONPath extraction
+  {
+    block: async (context) => ({
+      opcode: "extractWithJSONPath",
+      blockType: "reporter",
+      text: "extract from JSON [json] using JSONPath [path]",
+      schema: {
+        json: {
+          type: "string",
+          default: '{"name": "John", "age": 30}',
+          description: "JSON string to extract from",
+        },
+        path: {
+          type: "string",
+          default: "$.name",
+          description: "JSONPath expression",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { json, path } = context.validatedBody!;
+
+      try {
+        // Parse the JSON string
+        let parsedJson: any;
+        try {
+          parsedJson = JSON.parse(json);
+        } catch (parseError) {
+          throw new Error(
+            `Invalid JSON: ${
+              parseError instanceof Error ? parseError.message : "Unknown error"
+            }`
+          );
+        }
+
+        // Apply JSONPath expression
+        const results = JSONPath({ path, json: parsedJson });
+
+        // Return results as string
+        // If single result, return it directly (stringified if needed)
+        // If multiple results, return as JSON array string
+        if (results.length === 0) {
+          return "";
+        } else if (results.length === 1) {
+          const result = results[0];
+          // If it's a primitive, return as string; otherwise stringify
+          if (
+            typeof result === "string" ||
+            typeof result === "number" ||
+            typeof result === "boolean" ||
+            result === null
+          ) {
+            return String(result);
+          }
+          return JSON.stringify(result);
+        } else {
+          // Multiple results - return as JSON array string
+          return JSON.stringify(results);
+        }
+      } catch (error) {
+        throw new Error(
           error instanceof Error
             ? error.message
-            : "Failed to render template"
+            : "Failed to extract with JSONPath"
         );
       }
     },
