@@ -11,11 +11,13 @@
  * Extracts a Google Drive/Docs file ID from a URL or returns the input if it's already a file ID
  *
  * Supports various Google Drive/Docs URL formats:
+ * - https://drive.google.com/drive/folders/{folderId}
+ * - https://drive.google.com/drive/u/0/folders/{folderId}
  * - https://docs.google.com/document/d/{fileId}/edit
  * - https://docs.google.com/document/d/{fileId}
  * - https://drive.google.com/file/d/{fileId}/view
  * - https://drive.google.com/open?id={fileId}
- * - Direct file ID (returns as-is)
+ * - Direct file ID or folder ID (returns as-is)
  *
  * @param urlOrId - Google Drive/Docs URL or file ID
  * @returns The extracted file ID
@@ -33,6 +35,9 @@ export function extractFileId(urlOrId: string): string {
 
   // Try to extract from various URL patterns
   const patterns = [
+    // drive.google.com/drive/folders/{folderId}
+    // drive.google.com/drive/u/0/folders/{folderId}
+    /\/folders\/([a-zA-Z0-9_-]+)/,
     // docs.google.com/document/d/{fileId}
     /\/document\/d\/([a-zA-Z0-9_-]+)/,
     // drive.google.com/file/d/{fileId}
