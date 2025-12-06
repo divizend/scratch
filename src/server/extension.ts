@@ -121,18 +121,27 @@ export function registerExtensionEndpoint(app: Hono) {
         let fetchCode = "";
         if (isGet) {
           // GET request with query parameters
-          const queryParams =
-            params.length > 0
-              ? `?${params
-                  .map((p) => `${p}=" + encodeURIComponent(${p})`)
-                  .join("&")}`
-              : "";
-          fetchCode = `    return fetch("${baseUrl}${ep.endpoint}${queryParams}", {
+          if (params.length > 0) {
+            const queryParts = params.map(
+              (p, idx) =>
+                `"${idx === 0 ? "?" : "&"}${p}=" + encodeURIComponent(${p})`
+            );
+            fetchCode = `    return fetch("${baseUrl}${
+              ep.endpoint
+            }" + ${queryParts.join(" + ")}, {
       method: "GET",
       headers: {
         "Authorization": "Bearer ${jwtToken}",
       }
     }).then((response) => response.text());`;
+          } else {
+            fetchCode = `    return fetch("${baseUrl}${ep.endpoint}", {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer ${jwtToken}",
+      }
+    }).then((response) => response.text());`;
+          }
         } else {
           // POST request with body
           const fetchBody =
