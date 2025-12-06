@@ -25,11 +25,19 @@ import {
   GmailMessagePart,
   URI,
   URIType,
+  EmailQueue,
+  EmailProfile,
+  QueuedEmail,
+  Resend,
 } from "..";
 
 export class Universe {
   /** GSuite integration for Gmail and Google Workspace services */
   public gsuite!: GSuite;
+  /** Email queue for managing and sending emails */
+  public emailQueue!: EmailQueue;
+  /** Resend email service integration */
+  public resend?: Resend;
 
   /**
    * Constructs and initializes a new Universe instance
@@ -54,6 +62,89 @@ export class Universe {
     ]);
 
     universe.gsuite = gsuite!;
+
+    // Initialize Resend
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
+      universe.resend = new Resend(resendApiKey, resendApiRoot);
+    }
+
+    // Initialize email queue with profiles
+    const profiles: EmailProfile[] = [];
+
+    // Resend profile
+    if (universe.resend) {
+      profiles.push({
+        domains: [], // Will be populated dynamically
+        getDomains: async () => {
+          try {
+            return await universe.resend!.getDomains();
+          } catch (error) {
+            console.warn("Failed to fetch Resend domains:", error);
+            return [];
+          }
+        },
+        sendHandler: async (email: QueuedEmail) => {
+          const response = await universe.resend!.sendEmail({
+            from: email.from,
+            to: email.to,
+            subject: email.subject,
+            html: `<p>${email.content}</p>`,
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to send email via Resend: ${response.text}`
+            );
+          }
+        },
+      });
+    }
+
+    // GSuite profile
+    if (universe.gsuite) {
+      profiles.push({
+        domains: [], // Will be populated dynamically
+        getDomains: () => {
+          try {
+            const orgConfigs = (universe.gsuite as any).orgConfigs;
+            if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
+              return [];
+            }
+
+            const domains: string[] = [];
+            for (const orgConfig of Object.values(orgConfigs) as any[]) {
+              for (const domain of orgConfig.domains) {
+                if (domain.domainName) {
+                  domains.push(domain.domainName);
+                }
+              }
+            }
+            return domains;
+          } catch (error) {
+            console.warn("Failed to fetch GSuite domains:", error);
+            return [];
+          }
+        },
+        sendHandler: async (email: QueuedEmail) => {
+          if (!universe.gsuite) {
+            throw new Error("Google Workspace not connected");
+          }
+
+          // Use the "from" email as the GSuite user
+          const gsuiteUser = universe.gsuite.user(email.from);
+          const gmail = gsuiteUser.gmail();
+          await gmail.send({
+            to: email.to,
+            subject: email.subject,
+            body: email.content,
+          });
+        },
+      });
+    }
+
+    universe.emailQueue = new EmailQueue(profiles);
     return universe;
   }
 

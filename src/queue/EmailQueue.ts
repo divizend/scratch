@@ -1,6 +1,4 @@
-import { Resend } from "../resend";
 import { RateLimiter } from "./RateLimiter";
-import { getUniverse } from "../server/universe";
 
 export interface QueuedEmail {
   id: string;
@@ -18,12 +16,23 @@ export interface SendResult {
   message: string;
 }
 
-class EmailQueue {
+export interface EmailProfile {
+  /** Array of domains this profile handles */
+  domains: string[];
+  /** Function to send an email using this profile */
+  sendHandler: (email: QueuedEmail) => Promise<void>;
+  /** Optional function to get domains dynamically (for validation) */
+  getDomains?: () => Promise<string[]> | string[];
+}
+
+export class EmailQueue {
   private queue: QueuedEmail[] = [];
   private isSending = false;
   private rateLimiter: RateLimiter;
+  private profiles: EmailProfile[];
 
-  constructor(rateLimitDelayMs: number = 100) {
+  constructor(profiles: EmailProfile[], rateLimitDelayMs: number = 100) {
+    this.profiles = profiles;
     this.rateLimiter = new RateLimiter(rateLimitDelayMs);
   }
 
@@ -78,72 +87,75 @@ class EmailQueue {
   }
 
   /**
-   * Get available domains for routing
+   * Get all domains from all profiles
    */
-  private async getResendDomains(
-    resendApiKey: string,
-    resendApiRoot: string
-  ): Promise<string[]> {
-    try {
-      const resend = new Resend(resendApiKey, resendApiRoot);
-      return await resend.getDomains();
-    } catch (error) {
-      console.warn("Failed to fetch Resend domains:", error);
-      return [];
+  async getAllDomains(): Promise<string[]> {
+    const allDomains: string[] = [];
+
+    for (const profile of this.profiles) {
+      if (profile.getDomains) {
+        const domains = await profile.getDomains();
+        allDomains.push(
+          ...(Array.isArray(domains) ? domains : await Promise.resolve(domains))
+        );
+      } else {
+        allDomains.push(...profile.domains);
+      }
     }
+
+    return [...new Set(allDomains)]; // Remove duplicates
   }
 
   /**
-   * Get Google Workspace domains
+   * Find the profile that handles a given domain
    */
-  private getGSuiteDomains(): string[] {
-    const universe = getUniverse();
-    if (!universe || !universe.gsuite) {
-      return [];
-    }
+  private async findProfileForDomain(
+    domain: string
+  ): Promise<EmailProfile | null> {
+    for (const profile of this.profiles) {
+      let profileDomains: string[] = [];
 
-    try {
-      const orgConfigs = (universe.gsuite as any).orgConfigs;
-      if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
-        return [];
+      if (profile.getDomains) {
+        const domains = await profile.getDomains();
+        profileDomains = Array.isArray(domains)
+          ? domains
+          : await Promise.resolve(domains);
+      } else {
+        profileDomains = profile.domains;
       }
 
-      const domains: string[] = [];
-      for (const orgConfig of Object.values(orgConfigs) as any[]) {
-        for (const domain of orgConfig.domains) {
-          if (domain.domainName) {
-            domains.push(domain.domainName);
-          }
-        }
+      if (profileDomains.includes(domain)) {
+        return profile;
       }
-      return domains;
-    } catch (error) {
-      console.warn("Failed to fetch GSuite domains:", error);
-      return [];
     }
+
+    return null;
+  }
+
+  /**
+   * Validate that a domain is handled by one of the profiles
+   */
+  async validateDomain(domain: string): Promise<boolean> {
+    const profile = await this.findProfileForDomain(domain);
+    return profile !== null;
   }
 
   /**
    * Send emails (all or selected by IDs)
-   * Routes emails to Resend or Gmail based on sender domain
+   * Routes emails to appropriate profile handlers based on sender domain
    * @param ids - Array of email IDs to send, or null to send all
-   * @param resendApiKey - Resend API key
-   * @param resendApiRoot - Resend API root (default: "api.resend.com")
    * @returns Send result with statistics
    */
-  async send(
-    ids: string[] | null,
-    resendApiKey: string,
-    resendApiRoot: string = "api.resend.com"
-  ): Promise<SendResult> {
+  async send(ids: string[] | null): Promise<SendResult> {
     if (this.isSending) {
       throw new Error("Email sending already in progress");
     }
 
     // Always create a copy to avoid modifying the queue while iterating
-    const emailsToSend = ids === null 
-      ? [...this.queue]  // Copy all emails
-      : this.getByIds(ids);  // getByIds already returns a filtered copy
+    const emailsToSend =
+      ids === null
+        ? [...this.queue] // Copy all emails
+        : this.getByIds(ids); // getByIds already returns a filtered copy
 
     if (emailsToSend.length === 0) {
       return {
@@ -154,18 +166,6 @@ class EmailQueue {
       };
     }
 
-    // Get domains for routing
-    const [resendDomains, gsuiteDomains] = await Promise.all([
-      this.getResendDomains(resendApiKey, resendApiRoot),
-      Promise.resolve(this.getGSuiteDomains()),
-    ]);
-
-    console.log(`Routing emails: ${resendDomains.length} Resend domains, ${gsuiteDomains.length} GSuite domains`);
-    console.log(`Resend domains: ${resendDomains.join(", ")}`);
-    console.log(`GSuite domains: ${gsuiteDomains.join(", ")}`);
-
-    const resend = new Resend(resendApiKey, resendApiRoot);
-    const universe = getUniverse();
     this.isSending = true;
     let sent = 0;
     let errors = 0;
@@ -181,75 +181,27 @@ class EmailQueue {
             throw new Error(`Invalid sender email: ${email.from}`);
           }
 
-          const isResendDomain = resendDomains.includes(fromDomain);
-          const isGsuiteDomain = gsuiteDomains.includes(fromDomain);
+          // Find the profile that handles this domain
+          const profile = await this.findProfileForDomain(fromDomain);
 
-          console.log(`Processing email from ${email.from} (domain: ${fromDomain}) - Resend: ${isResendDomain}, GSuite: ${isGsuiteDomain}`);
-
-          // Domain was validated when queuing, so one of these must be true
-          if (isResendDomain) {
-            // Send via Resend
-            console.log(`Sending email ${email.id} via Resend`);
-            const response = await resend.sendEmail({
-              from: email.from,
-              to: email.to,
-              subject: email.subject,
-              html: `<p>${email.content}</p>`,
-            });
-
-            if (response.ok) {
-              sent++;
-              console.log(`Successfully sent email ${email.id} via Resend`);
-              // Remove sent email from queue
-              const index = this.queue.findIndex((e) => e.id === email.id);
-              if (index !== -1) {
-                this.queue.splice(index, 1);
-              }
-            } else {
-              errors++;
-              console.error(
-                `Failed to send email ${email.id} via Resend: ${response.text}`
-              );
-            }
-          } else if (isGsuiteDomain) {
-            // Send via Gmail
-            if (!universe || !universe.gsuite) {
-              throw new Error("Google Workspace not connected");
-            }
-
-            try {
-              console.log(`Sending email ${email.id} via Gmail`);
-              // Use the "from" email as the GSuite user
-              const gsuiteUser = universe.gsuite.user(email.from);
-              const gmail = gsuiteUser.gmail();
-              await gmail.send({
-                to: email.to,
-                subject: email.subject,
-                body: email.content,
-              });
-
-              sent++;
-              console.log(`Successfully sent email ${email.id} via Gmail`);
-              // Remove sent email from queue
-              const index = this.queue.findIndex((e) => e.id === email.id);
-              if (index !== -1) {
-                this.queue.splice(index, 1);
-              }
-            } catch (gmailError) {
-              errors++;
-              console.error(
-                `Failed to send email ${email.id} via Gmail: ${
-                  gmailError instanceof Error ? gmailError.message : String(gmailError)
-                }`
-              );
-            }
-          } else {
+          if (!profile) {
             // This should not happen since domain was validated when queuing
             // But handle it gracefully just in case
             errors++;
             console.error(
               `Unexpected: Unrecognized sender domain: ${fromDomain} for queued email ${email.id}. This should have been caught during validation.`
             );
+            return;
+          }
+
+          // Send using the profile's handler
+          await profile.sendHandler(email);
+
+          sent++;
+          // Remove sent email from queue
+          const index = this.queue.findIndex((e) => e.id === email.id);
+          if (index !== -1) {
+            this.queue.splice(index, 1);
           }
         } catch (error) {
           errors++;
@@ -274,6 +226,3 @@ class EmailQueue {
     };
   }
 }
-
-// Export singleton instance
-export const emailQueue = new EmailQueue();

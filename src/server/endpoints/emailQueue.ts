@@ -1,6 +1,4 @@
 import { ScratchEndpointDefinition } from "../scratch";
-import { emailQueue } from "../../queue";
-import { Resend } from "../../";
 import { getUniverse } from "../universe";
 
 // Email queue endpoints
@@ -43,53 +41,24 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error(`Invalid email address: ${from}`);
       }
 
-      // Get Resend domains
-      let resendDomains: string[] = [];
-      try {
-        const resendApiKey = process.env.RESEND_API_KEY;
-        if (resendApiKey) {
-          const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
-          const resend = new Resend(resendApiKey, resendApiRoot);
-          resendDomains = await resend.getDomains();
-        }
-      } catch (error) {
-        // If Resend API fails, continue with empty array
-        console.warn("Failed to fetch Resend domains:", error);
-      }
-
-      // Get Google Workspace domains
-      let gsuiteDomains: string[] = [];
+      // Get universe and email queue
       const universe = getUniverse();
-      if (universe && universe.gsuite) {
-        try {
-          const orgConfigs = (universe.gsuite as any).orgConfigs;
-          if (orgConfigs && Object.keys(orgConfigs).length > 0) {
-            for (const orgConfig of Object.values(orgConfigs) as any[]) {
-              for (const domain of orgConfig.domains) {
-                if (domain.domainName) {
-                  gsuiteDomains.push(domain.domainName);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          // If GSuite domain fetch fails, continue with empty array
-          console.warn("Failed to fetch GSuite domains:", error);
-        }
+      if (!universe || !universe.emailQueue) {
+        throw new Error("Email queue not available");
       }
 
-      // Validate domain is recognized
-      const isResendDomain = resendDomains.includes(fromDomain);
-      const isGsuiteDomain = gsuiteDomains.includes(fromDomain);
-
-      if (!isResendDomain && !isGsuiteDomain) {
+      // Validate domain using the email queue
+      const isValidDomain = await universe.emailQueue.validateDomain(
+        fromDomain
+      );
+      if (!isValidDomain) {
         throw new Error(
-          `Unrecognized sender domain: ${fromDomain}. Domain must be either a verified Resend domain or a Google Workspace domain.`
+          `Unrecognized sender domain: ${fromDomain}. Domain must be handled by one of the configured email profiles.`
         );
       }
 
       // Queue the email - routing will happen when sending
-      const queuedEmail = emailQueue.add({
+      const queuedEmail = universe.emailQueue.add({
         from,
         to,
         subject,
@@ -113,7 +82,11 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      return emailQueue.getAll();
+      const universe = getUniverse();
+      if (!universe || !universe.emailQueue) {
+        return [];
+      }
+      return universe.emailQueue.getAll();
     },
   },
 
@@ -126,7 +99,11 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      emailQueue.clear();
+      const universe = getUniverse();
+      if (!universe || !universe.emailQueue) {
+        throw new Error("Email queue not available");
+      }
+      universe.emailQueue.clear();
       return { success: true, message: "Email queue cleared" };
     },
   },
@@ -140,17 +117,16 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      if (emailQueue.getIsSending()) {
+      const universe = getUniverse();
+      if (!universe || !universe.emailQueue) {
+        throw new Error("Email queue not available");
+      }
+
+      if (universe.emailQueue.getIsSending()) {
         throw new Error("Email sending already in progress");
       }
 
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (!resendApiKey) {
-        throw new Error("RESEND_API_KEY environment variable is not set");
-      }
-
-      const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
-      return await emailQueue.send(null, resendApiKey, resendApiRoot);
+      return await universe.emailQueue.send(null);
     },
   },
 
@@ -168,7 +144,12 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      if (emailQueue.getIsSending()) {
+      const universe = getUniverse();
+      if (!universe || !universe.emailQueue) {
+        throw new Error("Email queue not available");
+      }
+
+      if (universe.emailQueue.getIsSending()) {
         throw new Error("Email sending already in progress");
       }
 
@@ -179,13 +160,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error("Invalid or empty ids array");
       }
 
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (!resendApiKey) {
-        throw new Error("RESEND_API_KEY environment variable is not set");
-      }
-
-      const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
-      return await emailQueue.send(idsArray, resendApiKey, resendApiRoot);
+      return await universe.emailQueue.send(idsArray);
     },
   },
 
@@ -203,6 +178,11 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
+      const universe = getUniverse();
+      if (!universe || !universe.emailQueue) {
+        throw new Error("Email queue not available");
+      }
+
       const { ids } = context.validatedBody || {};
       const idsArray = JSON.parse(ids);
 
@@ -210,7 +190,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error("Invalid or empty ids array");
       }
 
-      const removed = emailQueue.removeByIds(idsArray);
+      const removed = universe.emailQueue.removeByIds(idsArray);
       return {
         success: true,
         removed,

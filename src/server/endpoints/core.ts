@@ -1,5 +1,4 @@
 import { ScratchEndpointDefinition } from "../scratch";
-import { Resend } from "../../";
 import { signJwtToken } from "../auth";
 import { getUniverse } from "../universe";
 
@@ -89,15 +88,11 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       const jwt = await signJwtToken({ email });
 
       // Send email via Resend
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (!resendApiKey) {
-        throw new Error("RESEND_API_KEY environment variable is not set");
+      if (!universe.resend) {
+        throw new Error("Resend not configured");
       }
 
-      const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
-      const resend = new Resend(resendApiKey, resendApiRoot);
-
-      const response = await resend.sendEmail({
+      const response = await universe.resend.sendEmail({
         from: "jwt-issuer@divizend.ai",
         to: email,
         subject: "Admin Access Token",
