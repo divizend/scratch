@@ -161,7 +161,8 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       schema: {
         template: {
           type: "string",
-          default: "Hello, {{name}}!",
+          default:
+            "🎉 Welcome, {{name}}! You have {{count}} new {{#isOne}}notification{{/isOne}}{{^isOne}}notifications{{/isOne}}. Your next meeting is at {{meetingTime}}.",
           description: "Mustache template string",
         },
         data: {
@@ -171,6 +172,12 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
             properties: {},
             additionalProperties: true,
           },
+          default: JSON.stringify({
+            name: "Alice",
+            count: 1,
+            isOne: true,
+            meetingTime: "2:00 PM",
+          }),
           description: "JSON object with template data",
         },
       },
@@ -197,11 +204,19 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
             properties: {},
             additionalProperties: true,
           },
+          default: JSON.stringify({
+            users: [
+              { name: "Alice", email: "alice@example.com", role: "admin" },
+              { name: "Bob", email: "bob@example.com", role: "user" },
+              { name: "Charlie", email: "charlie@example.com", role: "user" },
+            ],
+            metadata: { total: 3, lastUpdated: "2024-01-15" },
+          }),
           description: "JSON object to extract from",
         },
         path: {
           type: "string",
-          default: "$.name",
+          default: "$.users[0].email",
           description: "JSONPath expression",
         },
       },
@@ -248,6 +263,13 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
             type: "array",
             items: {},
           },
+          default: JSON.stringify([
+            "🚀 Launch Project",
+            "📧 Review Emails",
+            "💡 Brainstorm Ideas",
+            "✅ Complete Tasks",
+            "🎯 Set Goals",
+          ]),
           description: "JSON array",
         },
       },
