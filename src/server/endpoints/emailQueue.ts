@@ -116,21 +116,20 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       text: "send selected queued emails [ids]",
       schema: {
         ids: {
-          type: "string",
-          default: "[]",
-          description: "JSON array of email IDs to send",
+          type: "json",
+          schema: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+          },
+          description: "Array of email IDs to send",
         },
       },
     }),
     handler: async (context) => {
       const { ids } = context.validatedBody!;
-      const idsArray = JSON.parse(ids);
-
-      if (!Array.isArray(idsArray) || idsArray.length === 0) {
-        throw new Error("Invalid or empty ids array");
-      }
-
-      return await context.universe!.emailQueue.send(idsArray);
+      // ids is already parsed and validated as a non-empty array by the middleware
+      return await context.universe!.emailQueue.send(ids);
     },
     requiredModules: [UniverseModule.EmailQueue],
   },
@@ -143,21 +142,20 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       text: "remove queued emails [ids]",
       schema: {
         ids: {
-          type: "string",
-          default: "[]",
-          description: "JSON array of email IDs to remove",
+          type: "json",
+          schema: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+          },
+          description: "Array of email IDs to remove",
         },
       },
     }),
     handler: async (context) => {
       const { ids } = context.validatedBody!;
-      const idsArray = JSON.parse(ids);
-
-      if (!Array.isArray(idsArray) || idsArray.length === 0) {
-        throw new Error("Invalid or empty ids array");
-      }
-
-      const removed = context.universe!.emailQueue.removeByIds(idsArray);
+      // ids is already parsed and validated as a non-empty array by the middleware
+      const removed = context.universe!.emailQueue.removeByIds(ids);
       return {
         success: true,
         removed,

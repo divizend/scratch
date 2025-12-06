@@ -13,9 +13,17 @@ export interface ScratchBlock {
   text: string;
   schema?: {
     [key: string]: {
-      type: "string" | "number" | "boolean" | "array" | "object";
+      type: "string" | "number" | "boolean" | "array" | "object" | "json";
       default?: any;
       description?: string;
+      schema?: {
+        // Property-level JSON schema (not full JsonSchema)
+        type: "string" | "number" | "boolean" | "array" | "object";
+        default?: any;
+        items?: any;
+        properties?: any;
+        [key: string]: any;
+      }; // Required when type is "json"
       [key: string]: any; // Allow additional JSON schema properties
     };
   };
@@ -51,14 +59,78 @@ export function getRegisteredEndpoints(): ScratchEndpoint[] {
   return [...scratchEndpoints];
 }
 
+// Helper function to generate default value from JSON schema property
+function generateDefaultFromSchema(propSchema: any): any {
+  if (propSchema.default !== undefined) {
+    return propSchema.default;
+  }
+
+  switch (propSchema.type) {
+    case "object":
+      const obj: any = {};
+      if (propSchema.properties) {
+        for (const [key, nestedSchema] of Object.entries(
+          propSchema.properties
+        )) {
+          obj[key] = generateDefaultFromSchema(nestedSchema);
+        }
+      }
+      return obj;
+    case "array":
+      return [];
+    case "string":
+      return "";
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    case "null":
+      return null;
+    default:
+      return null;
+  }
+}
+
 // Helper function to construct full JSON schema from properties
 function constructJsonSchema(schema?: ScratchBlock["schema"]): JsonSchema {
-  // Determine required fields (all fields are required by default)
-  const required: string[] = schema ? Object.keys(schema) : [];
+  if (!schema) {
+    return {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    };
+  }
+
+  const properties: any = {};
+  const required: string[] = [];
+
+  for (const [key, propSchema] of Object.entries(schema)) {
+    if (propSchema.type === "json") {
+      // For JSON type, use the provided schema and validate/parse the JSON string
+      if (!propSchema.schema) {
+        throw new Error(
+          `Property ${key} has type "json" but no schema provided`
+        );
+      }
+      // Store the JSON schema for validation, but the actual property type is string (JSON string)
+      properties[key] = {
+        type: "string",
+        description: propSchema.description,
+        // Store the JSON schema in a custom property for validation
+        _jsonSchema: propSchema.schema,
+      };
+      // Don't add JSON fields to required - they're validated separately before main validation
+    } else {
+      // For other types, use the property schema directly
+      properties[key] = propSchema;
+      required.push(key);
+    }
+  }
 
   return {
     type: "object",
-    properties: schema || {},
+    properties,
     required,
     additionalProperties: false,
   };
@@ -82,6 +154,8 @@ function generateArgumentsFromSchema(schema?: ScratchBlock["schema"]): {
     for (const [key, propSchema] of Object.entries(schema)) {
       // Map JSON schema types to Scratch argument types
       let scratchType: "string" | "number" | "boolean" = "string";
+      let defaultValue: any = propSchema.default;
+
       if (propSchema.type === "number") {
         scratchType = "number";
       } else if (propSchema.type === "boolean") {
@@ -89,11 +163,29 @@ function generateArgumentsFromSchema(schema?: ScratchBlock["schema"]): {
       } else if (propSchema.type === "array" || propSchema.type === "object") {
         // Arrays and objects are represented as strings in Scratch (JSON strings)
         scratchType = "string";
+        if (defaultValue === undefined) {
+          defaultValue = propSchema.type === "array" ? "[]" : "{}";
+        } else if (typeof defaultValue !== "string") {
+          defaultValue = JSON.stringify(defaultValue);
+        }
+      } else if (propSchema.type === "json") {
+        // JSON type is always a string in Scratch (JSON string)
+        scratchType = "string";
+        // Generate default from the JSON schema if not provided
+        if (defaultValue === undefined && propSchema.schema) {
+          const generatedDefault = generateDefaultFromSchema(propSchema.schema);
+          defaultValue = JSON.stringify(generatedDefault);
+        } else if (
+          defaultValue !== undefined &&
+          typeof defaultValue !== "string"
+        ) {
+          defaultValue = JSON.stringify(defaultValue);
+        }
       }
 
       arguments_[key] = {
         type: scratchType,
-        defaultValue: propSchema.default,
+        defaultValue,
       };
     }
   }
@@ -138,7 +230,83 @@ function validateArguments(block: ScratchBlock) {
       const validator =
         universe?.jsonSchemaValidator || new JsonSchemaValidator();
 
-      const result = validator.validate(fullSchema, data);
+      // Pre-process JSON type fields: parse JSON strings and validate against their schemas
+      if (block.schema) {
+        for (const [key, propSchema] of Object.entries(block.schema)) {
+          if (
+            propSchema.type === "json" &&
+            data[key] !== undefined &&
+            data[key] !== null &&
+            data[key] !== ""
+          ) {
+            try {
+              // Parse the JSON string
+              const parsed = JSON.parse(data[key]);
+
+              // Validate against the JSON schema if provided
+              if (propSchema.schema) {
+                // Wrap the property schema in an object schema for validation
+                const wrappedSchema: JsonSchema = {
+                  type: "object",
+                  properties: {
+                    value: propSchema.schema,
+                  },
+                  required: ["value"],
+                };
+                const jsonSchemaResult = validator.validate(wrappedSchema, {
+                  value: parsed,
+                });
+
+                if (!jsonSchemaResult.valid) {
+                  return c.json(
+                    {
+                      error: `Validation failed for ${key}`,
+                      errors: jsonSchemaResult.errors,
+                    },
+                    400
+                  );
+                }
+
+                // Use the validated value
+                data[key] = jsonSchemaResult.data?.value ?? parsed;
+              } else {
+                // No schema provided, just use parsed value
+                data[key] = parsed;
+              }
+            } catch (parseError) {
+              return c.json(
+                {
+                  error: `Invalid JSON for ${key}: ${
+                    parseError instanceof Error
+                      ? parseError.message
+                      : "Unknown error"
+                  }`,
+                },
+                400
+              );
+            }
+          }
+        }
+      }
+
+      // For JSON type fields, we've already parsed and validated them
+      // Skip them in the main schema validation to avoid type conflicts
+      const dataForValidation: any = { ...data };
+      if (block.schema) {
+        for (const [key, propSchema] of Object.entries(block.schema)) {
+          if (
+            propSchema.type === "json" &&
+            dataForValidation[key] !== undefined
+          ) {
+            // JSON fields are already parsed, so we need to mark them as validated
+            // The validator expects strings, but we've already converted them to objects
+            // So we'll validate everything else, then merge the JSON fields back
+            delete dataForValidation[key];
+          }
+        }
+      }
+
+      const result = validator.validate(fullSchema, dataForValidation);
 
       if (!result.valid) {
         return c.json(
@@ -150,8 +318,19 @@ function validateArguments(block: ScratchBlock) {
         );
       }
 
+      // Merge validated data with parsed JSON fields
+      const finalData = { ...result.data };
+      if (block.schema) {
+        for (const [key, propSchema] of Object.entries(block.schema)) {
+          if (propSchema.type === "json" && data[key] !== undefined) {
+            // Use the already-parsed JSON value
+            finalData[key] = data[key];
+          }
+        }
+      }
+
       // Attach validated body to context for use in handler
-      c.validatedBody = result.data || {};
+      c.validatedBody = finalData;
       return next();
     } catch (error) {
       return c.json({ error: "Invalid request" }, 400);

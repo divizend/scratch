@@ -165,36 +165,21 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
           description: "Mustache template string",
         },
         data: {
-          type: "string",
-          default: '{"name": "World"}',
+          type: "json",
+          schema: {
+            type: "object",
+            properties: {},
+            additionalProperties: true,
+          },
           description: "JSON object with template data",
         },
       },
     }),
     handler: async (context) => {
       const { template, data } = context.validatedBody!;
-
-      try {
-        // Parse the data JSON string
-        let parsedData: any;
-        try {
-          parsedData = JSON.parse(data);
-        } catch (parseError) {
-          throw new Error(
-            `Invalid JSON data: ${
-              parseError instanceof Error ? parseError.message : "Unknown error"
-            }`
-          );
-        }
-
-        // Render the template using Mustache
-        const rendered = Mustache.render(template, parsedData);
-        return rendered;
-      } catch (error) {
-        throw new Error(
-          error instanceof Error ? error.message : "Failed to render template"
-        );
-      }
+      // data is already parsed and validated by the middleware
+      const rendered = Mustache.render(template, data);
+      return rendered;
     },
   },
 
@@ -206,9 +191,13 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       text: "extract from JSON [json] using JSONPath [path]",
       schema: {
         json: {
-          type: "string",
-          default: '{"name": "John", "age": 30}',
-          description: "JSON string to extract from",
+          type: "json",
+          schema: {
+            type: "object",
+            properties: {},
+            additionalProperties: true,
+          },
+          description: "JSON object to extract from",
         },
         path: {
           type: "string",
@@ -219,50 +208,29 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     }),
     handler: async (context) => {
       const { json, path } = context.validatedBody!;
+      // json is already parsed and validated by the middleware
+      const results = JSONPath({ path, json });
 
-      try {
-        // Parse the JSON string
-        let parsedJson: any;
-        try {
-          parsedJson = JSON.parse(json);
-        } catch (parseError) {
-          throw new Error(
-            `Invalid JSON: ${
-              parseError instanceof Error ? parseError.message : "Unknown error"
-            }`
-          );
+      // Return results as string
+      // If single result, return it directly (stringified if needed)
+      // If multiple results, return as JSON array string
+      if (results.length === 0) {
+        return "";
+      } else if (results.length === 1) {
+        const result = results[0];
+        // If it's a primitive, return as string; otherwise stringify
+        if (
+          typeof result === "string" ||
+          typeof result === "number" ||
+          typeof result === "boolean" ||
+          result === null
+        ) {
+          return String(result);
         }
-
-        // Apply JSONPath expression
-        const results = JSONPath({ path, json: parsedJson });
-
-        // Return results as string
-        // If single result, return it directly (stringified if needed)
-        // If multiple results, return as JSON array string
-        if (results.length === 0) {
-          return "";
-        } else if (results.length === 1) {
-          const result = results[0];
-          // If it's a primitive, return as string; otherwise stringify
-          if (
-            typeof result === "string" ||
-            typeof result === "number" ||
-            typeof result === "boolean" ||
-            result === null
-          ) {
-            return String(result);
-          }
-          return JSON.stringify(result);
-        } else {
-          // Multiple results - return as JSON array string
-          return JSON.stringify(results);
-        }
-      } catch (error) {
-        throw new Error(
-          error instanceof Error
-            ? error.message
-            : "Failed to extract with JSONPath"
-        );
+        return JSON.stringify(result);
+      } else {
+        // Multiple results - return as JSON array string
+        return JSON.stringify(results);
       }
     },
   },
@@ -275,40 +243,19 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       text: "length of array [array]",
       schema: {
         array: {
-          type: "string",
-          default: "[]",
-          description: "JSON array string",
+          type: "json",
+          schema: {
+            type: "array",
+            items: {},
+          },
+          description: "JSON array",
         },
       },
     }),
     handler: async (context) => {
       const { array } = context.validatedBody!;
-
-      try {
-        // Parse the array JSON string
-        let parsedArray: any;
-        try {
-          parsedArray = JSON.parse(array);
-        } catch (parseError) {
-          throw new Error(
-            `Invalid JSON array: ${
-              parseError instanceof Error ? parseError.message : "Unknown error"
-            }`
-          );
-        }
-
-        // Check if it's actually an array
-        if (!Array.isArray(parsedArray)) {
-          throw new Error("Input is not an array");
-        }
-
-        // Return the length as a stringified number
-        return String(parsedArray.length);
-      } catch (error) {
-        throw new Error(
-          error instanceof Error ? error.message : "Failed to get array length"
-        );
-      }
+      // array is already parsed and validated as an array by the middleware
+      return String(array.length);
     },
   },
 ];
