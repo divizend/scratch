@@ -75,9 +75,9 @@ export class Universe {
 
     universe.gsuite = gsuite!;
 
-    // Initialize Resend (constructor reads from environment variables)
+    // Initialize Resend (fetches domains once during construction)
     try {
-      universe.resend = new Resend();
+      universe.resend = await Resend.construct();
     } catch (error) {
       // Resend not configured - this is optional, so we continue without it
       console.warn(
@@ -91,15 +91,13 @@ export class Universe {
 
     // Resend profile
     if (universe.resend) {
+      // Fetch domains once during profile creation
+      const resendDomains = universe.resend.getDomains();
       profiles.push({
-        domains: [], // Will be populated dynamically
-        getDomains: async () => {
-          try {
-            return await universe.resend!.getDomains();
-          } catch (error) {
-            console.warn("Failed to fetch Resend domains:", error);
-            return [];
-          }
+        domains: resendDomains, // Use cached domains
+        getDomains: () => {
+          // Return cached domains synchronously
+          return universe.resend!.getDomains();
         },
         sendHandler: async (email: QueuedEmail) => {
           const response = await universe.resend!.sendEmail({
