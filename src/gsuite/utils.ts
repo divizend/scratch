@@ -7,7 +7,7 @@
  * @version 1.0.0
  */
 
-import { GSuiteUser, Document, Spreadsheet, Sheet, Spreadsheets } from "../..";
+import { GSuiteUser, Document, Spreadsheet, Sheet, Spreadsheets } from "..";
 
 /**
  * Extracts a Google Drive/Docs file ID from a URL or returns the input if it's already a file ID
@@ -88,7 +88,11 @@ export async function openDocument(
 export async function openSpreadsheetFirstSheet(
   gsuiteUser: GSuiteUser,
   spreadsheetIdOrUrl: string
-): Promise<{ spreadsheet: Spreadsheet; sheet: Sheet; spreadsheets: Spreadsheets }> {
+): Promise<{
+  spreadsheet: Spreadsheet;
+  sheet: Sheet;
+  spreadsheets: Spreadsheets;
+}> {
   const extractedId = extractFileId(spreadsheetIdOrUrl);
   const spreadsheets = gsuiteUser.spreadsheets();
   const spreadsheet = await spreadsheets.open(extractedId);
