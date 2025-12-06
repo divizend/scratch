@@ -29,6 +29,7 @@ import {
   EmailProfile,
   QueuedEmail,
   Resend,
+  JsonSchemaValidator,
 } from "..";
 
 /**
@@ -50,6 +51,8 @@ export class Universe {
   public emailQueue!: EmailQueue;
   /** Resend email service integration */
   public resend?: Resend;
+  /** JSON Schema validator for request validation */
+  public jsonSchemaValidator: JsonSchemaValidator = new JsonSchemaValidator();
 
   /**
    * Constructs and initializes a new Universe instance

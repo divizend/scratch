@@ -20,3 +20,4 @@ export * from "./Fragment";
 export * from "./FragmentServingMode";
 export * from "./URI";
 export * from "./Currency";
+export * from "./JsonSchemaValidator";

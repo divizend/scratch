@@ -9,22 +9,26 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       opcode: "queueEmail",
       blockType: "command",
       text: "add email to queue from [from] to [to] subject [subject] content [content]",
-      arguments: {
+      schema: {
         from: {
           type: "string",
-          defaultValue: "scratch-demo@divizend.ai",
+          default: "scratch-demo@divizend.ai",
+          description: "Sender email address",
         },
         to: {
           type: "string",
-          defaultValue: context.userEmail ?? "julian.nalenz@divizend.com",
+          default: context.userEmail ?? "julian.nalenz@divizend.com",
+          description: "Recipient email address",
         },
         subject: {
           type: "string",
-          defaultValue: "Hello from a Scratch block!",
+          default: "Hello from a Scratch block!",
+          description: "Email subject",
         },
         content: {
           type: "string",
-          defaultValue: "This email was sent from a Scratch block!",
+          default: "This email was sent from a Scratch block!",
+          description: "Email content",
         },
       },
     }),
@@ -70,7 +74,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       opcode: "getEmailQueue",
       blockType: "reporter",
       text: "queued emails",
-      arguments: {},
     }),
     handler: async (context) => {
       return context.universe!.emailQueue.getAll();
@@ -84,7 +87,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       opcode: "clearEmailQueue",
       blockType: "command",
       text: "clear all queued emails",
-      arguments: {},
     }),
     handler: async (context) => {
       context.universe!.emailQueue.clear();
@@ -99,7 +101,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       opcode: "sendAllEmails",
       blockType: "command",
       text: "send all queued emails",
-      arguments: {},
     }),
     handler: async (context) => {
       return await context.universe!.emailQueue.send(null);
@@ -113,10 +114,11 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       opcode: "sendSelectedEmails",
       blockType: "command",
       text: "send selected queued emails [ids]",
-      arguments: {
+      schema: {
         ids: {
           type: "string",
-          defaultValue: "[]",
+          default: "[]",
+          description: "JSON array of email IDs to send",
         },
       },
     }),
@@ -139,10 +141,11 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       opcode: "removeEmails",
       blockType: "command",
       text: "remove queued emails [ids]",
-      arguments: {
+      schema: {
         ids: {
           type: "string",
-          defaultValue: "[]",
+          default: "[]",
+          description: "JSON array of email IDs to remove",
         },
       },
     }),

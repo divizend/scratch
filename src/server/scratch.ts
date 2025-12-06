@@ -1,15 +1,22 @@
 import { Hono } from "hono";
 import { jwtAuth } from "./auth";
-import { Universe, UniverseModule } from "../core";
+import {
+  Universe,
+  UniverseModule,
+  JsonSchema,
+  JsonSchemaValidator,
+} from "../core";
 
 export interface ScratchBlock {
   opcode: string;
   blockType: "command" | "reporter" | "boolean" | "hat";
   text: string;
-  arguments: {
+  schema?: {
     [key: string]: {
-      type: "string" | "number" | "boolean";
-      defaultValue?: string | number | boolean;
+      type: "string" | "number" | "boolean" | "array" | "object";
+      default?: any;
+      description?: string;
+      [key: string]: any; // Allow additional JSON schema properties
     };
   };
 }
@@ -44,24 +51,79 @@ export function getRegisteredEndpoints(): ScratchEndpoint[] {
   return [...scratchEndpoints];
 }
 
-// Validation middleware that checks request body against block arguments
+// Helper function to construct full JSON schema from properties
+function constructJsonSchema(schema?: ScratchBlock["schema"]): JsonSchema {
+  // Determine required fields (all fields are required by default)
+  const required: string[] = schema ? Object.keys(schema) : [];
+
+  return {
+    type: "object",
+    properties: schema || {},
+    required,
+    additionalProperties: false,
+  };
+}
+
+// Helper function to generate Scratch arguments from schema properties
+function generateArgumentsFromSchema(schema?: ScratchBlock["schema"]): {
+  [key: string]: {
+    type: "string" | "number" | "boolean";
+    defaultValue?: string | number | boolean;
+  };
+} {
+  const arguments_: {
+    [key: string]: {
+      type: "string" | "number" | "boolean";
+      defaultValue?: string | number | boolean;
+    };
+  } = {};
+
+  if (schema) {
+    for (const [key, propSchema] of Object.entries(schema)) {
+      // Map JSON schema types to Scratch argument types
+      let scratchType: "string" | "number" | "boolean" = "string";
+      if (propSchema.type === "number") {
+        scratchType = "number";
+      } else if (propSchema.type === "boolean") {
+        scratchType = "boolean";
+      } else if (propSchema.type === "array" || propSchema.type === "object") {
+        // Arrays and objects are represented as strings in Scratch (JSON strings)
+        scratchType = "string";
+      }
+
+      arguments_[key] = {
+        type: scratchType,
+        defaultValue: propSchema.default,
+      };
+    }
+  }
+
+  return arguments_;
+}
+
+// Validation middleware that checks request body against JSON schema
 function validateArguments(block: ScratchBlock) {
   return async (c: any, next: any) => {
     try {
+      // Construct full JSON schema from properties
+      const fullSchema = constructJsonSchema(block.schema);
+
       // For GET requests (reporter blocks), get params from query string
       // For POST requests (command blocks), get from body
       const isGet = c.req.method === "GET";
       let data: any = {};
 
       if (isGet) {
-        // For GET, get all query params
+        // For GET, get all query params from schema properties
         const query = c.req.query();
-        data = Object.fromEntries(
-          Object.keys(block.arguments || {}).map((key) => [
-            key,
-            query[key] !== undefined ? query[key] : undefined,
-          ])
-        );
+        if (block.schema) {
+          data = Object.fromEntries(
+            Object.keys(block.schema).map((key) => [
+              key,
+              query[key] !== undefined ? query[key] : undefined,
+            ])
+          );
+        }
       } else {
         try {
           data = await c.req.json();
@@ -70,55 +132,26 @@ function validateArguments(block: ScratchBlock) {
         }
       }
 
-      const errors: string[] = [];
-      const validatedBody: any = { ...data };
+      // Use Universe's JSON schema validator
+      const { getUniverse } = await import("./universe");
+      const universe = getUniverse();
+      const validator =
+        universe?.jsonSchemaValidator || new JsonSchemaValidator();
 
-      // Check all arguments defined in the block - ALL arguments are required
-      if (block.arguments) {
-        for (const [key, arg] of Object.entries(block.arguments)) {
-          // Check if argument is missing or empty
-          if (
-            !(key in validatedBody) ||
-            validatedBody[key] === undefined ||
-            validatedBody[key] === null ||
-            validatedBody[key] === ""
-          ) {
-            // All arguments are required - no optional arguments allowed
-            errors.push(`Missing required parameter: ${key}`);
-          } else {
-            // Type validation
-            if (arg.type === "number") {
-              const num = Number(validatedBody[key]);
-              if (isNaN(num)) {
-                errors.push(`Parameter ${key} must be a number`);
-              } else {
-                validatedBody[key] = num;
-              }
-            } else if (arg.type === "boolean") {
-              const val = validatedBody[key];
-              if (typeof val === "string") {
-                validatedBody[key] = val === "true" || val === "1";
-              } else {
-                validatedBody[key] = Boolean(val);
-              }
-            }
-            // string type doesn't need conversion
-          }
-        }
-      }
+      const result = validator.validate(fullSchema, data);
 
-      if (errors.length > 0) {
+      if (!result.valid) {
         return c.json(
           {
             error: "Validation failed",
-            errors,
+            errors: result.errors,
           },
           400
         );
       }
 
-      // Attach validated body (with defaults applied) to context for use in handler
-      c.validatedBody = validatedBody;
+      // Attach validated body to context for use in handler
+      c.validatedBody = result.data || {};
       return next();
     } catch (error) {
       return c.json({ error: "Invalid request" }, 400);
@@ -254,8 +287,13 @@ export async function registerScratchEndpoint(
       if (typeof result === "string") {
         return c.text(result);
       }
-      // Otherwise, wrap in JSON response
-      return c.json(result || { success: true });
+      // Arrays and objects should always be returned as JSON
+      // (result || { success: true }) handles null/undefined but arrays are truthy
+      if (result === null || result === undefined) {
+        return c.json({ success: true });
+      }
+      // Otherwise, wrap in JSON response (handles arrays, objects, etc.)
+      return c.json(result);
     } catch (error) {
       return c.json(
         {

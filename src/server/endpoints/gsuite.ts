@@ -10,7 +10,6 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       opcode: "getUsers",
       blockType: "reporter",
       text: "organization users",
-      arguments: {},
     }),
     handler: async (context) => {
       if (!context.userEmail) {
@@ -39,20 +38,17 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       opcode: "getGmailLabels",
       blockType: "reporter",
       text: "Gmail labels for user [userEmail]",
-      arguments: {
+      schema: {
         userEmail: {
           type: "string",
-          defaultValue: context.userEmail ?? "",
+          default: context.userEmail ?? "",
+          description: "Gmail user email address",
         },
       },
     }),
     handler: async (context) => {
       const { userEmail } = context.validatedBody!;
       const email = userEmail;
-
-      if (!email) {
-        return [];
-      }
 
       try {
         const gsuiteUser = context.universe!.gsuite.user(email);
@@ -75,28 +71,27 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       opcode: "listGmailMessages",
       blockType: "reporter",
       text: "Gmail messages with label [label] limit [limit] for user [userEmail]",
-      arguments: {
+      schema: {
         label: {
           type: "string",
-          defaultValue: "INBOX",
+          default: "INBOX",
+          description: "Gmail label to filter messages",
         },
         limit: {
           type: "string",
-          defaultValue: "10",
+          default: "10",
+          description: "Maximum number of messages to retrieve",
         },
         userEmail: {
           type: "string",
-          defaultValue: context.userEmail ?? "",
+          default: context.userEmail ?? "",
+          description: "Gmail user email address",
         },
       },
     }),
     handler: async (context) => {
       const { label, limit, userEmail } = context.validatedBody!;
       const email = userEmail;
-
-      if (!email) {
-        return [];
-      }
 
       try {
         const gsuiteUser = context.universe!.gsuite.user(email);
@@ -133,26 +128,25 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       opcode: "copyDriveFile",
       blockType: "command",
       text: "copy Google Drive file [sourceFileId] to folder [destFolderId] with name [name]",
-      arguments: {
+      schema: {
         sourceFileId: {
           type: "string",
-          defaultValue: "",
+          default: "",
+          description: "Source Google Drive file ID",
         },
         destFolderId: {
           type: "string",
-          defaultValue: "",
+          default: "",
+          description: "Destination folder ID",
         },
         name: {
           type: "string",
-          defaultValue: "Copy",
+          default: "Copy",
+          description: "Name for the copied file",
         },
       },
     }),
     handler: async (context) => {
-      if (!context.userEmail) {
-        throw new Error("User not authenticated");
-      }
-
       const { sourceFileId, destFolderId, name } = context.validatedBody!;
 
       try {

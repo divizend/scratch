@@ -10,7 +10,6 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       opcode: "getDomains",
       blockType: "reporter",
       text: "available email domains",
-      arguments: {},
     }),
     handler: async (context) => {
       try {
@@ -43,10 +42,11 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       opcode: "sendJwt",
       blockType: "command",
       text: "send access token to [email]",
-      arguments: {
+      schema: {
         email: {
           type: "string",
-          defaultValue: context.userEmail ?? "",
+          default: context.userEmail ?? "",
+          description: "Email address to send JWT token to",
         },
       },
     }),
@@ -102,7 +102,6 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       opcode: "getUser",
       blockType: "reporter",
       text: "current user email",
-      arguments: {},
     }),
     handler: async (context) => {
       return context.userEmail || "Unknown";
@@ -115,7 +114,6 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       opcode: "getHealth",
       blockType: "reporter",
       text: "Google Workspace connection status",
-      arguments: {},
     }),
     handler: async (context) => {
       try {

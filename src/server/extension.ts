@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { validateJwtToken } from "./auth";
-import { scratchEndpoints, ScratchContext } from "./scratch";
+import { scratchEndpoints, ScratchContext, ScratchBlock } from "./scratch";
 
 // Helper function to convert email to hyphenated name (e.g., "julian.nalenz@divizend.com" -> "julian-nalenz")
 function emailToHyphenatedName(email: string): string {
@@ -61,6 +61,43 @@ function getBaseUrl(c: any): string {
   return hostedAt;
 }
 
+// Helper function to generate Scratch arguments from schema properties (same as in scratch.ts)
+function generateArgumentsFromSchema(schema?: ScratchBlock["schema"]): {
+  [key: string]: {
+    type: "string" | "number" | "boolean";
+    defaultValue?: string | number | boolean;
+  };
+} {
+  const arguments_: {
+    [key: string]: {
+      type: "string" | "number" | "boolean";
+      defaultValue?: string | number | boolean;
+    };
+  } = {};
+
+  if (schema) {
+    for (const [key, propSchema] of Object.entries(schema)) {
+      // Map JSON schema types to Scratch argument types
+      let scratchType: "string" | "number" | "boolean" = "string";
+      if (propSchema.type === "number") {
+        scratchType = "number";
+      } else if (propSchema.type === "boolean") {
+        scratchType = "boolean";
+      } else if (propSchema.type === "array" || propSchema.type === "object") {
+        // Arrays and objects are represented as strings in Scratch (JSON strings)
+        scratchType = "string";
+      }
+
+      arguments_[key] = {
+        type: scratchType,
+        defaultValue: propSchema.default,
+      };
+    }
+  }
+
+  return arguments_;
+}
+
 // Register extension source endpoint
 export function registerExtensionEndpoint(app: Hono) {
   app.get("*", async (c, next) => {
@@ -111,10 +148,16 @@ export function registerExtensionEndpoint(app: Hono) {
       })
     );
 
-    const blocks = resolvedEndpoints.map((ep) => ep.block);
+    const blocks = resolvedEndpoints.map((ep) => {
+      // Generate arguments from schema for Scratch extension
+      const args = generateArgumentsFromSchema(ep.block.schema);
+      return { ...ep.block, arguments: args };
+    });
     const methods = resolvedEndpoints
       .map((ep) => {
-        const params = Object.keys(ep.block.arguments);
+        const params = Object.keys(
+          generateArgumentsFromSchema(ep.block.schema)
+        );
         const paramList = params.join(", ");
         const isGet = ep.block.blockType === "reporter";
 
