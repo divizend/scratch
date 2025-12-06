@@ -13,20 +13,19 @@ The web server defined in this repository ([github.com/divizend/scratch](https:/
 ## Local setup
 
 1. `cp .env.example .env`
-2. Update the different secrets in your `.env`. Follow the instructions below if you would also like to set up the integration with Google Workspace.
+2. Update the different secrets in your `.env`. Follow the instructions below to set up the integration with Google Workspace.
 3. Run `bun install`
-4. Run `bun tools/generate-token.ts`
-5. Run `bun run dev`
-6. Visit http://localhost:3000 and click on "Admin interface, then enter the token you generated in step 4.
-7. Visit https://sheeptester.github.io/scratch-gui/?url=https://scratch.divizend.ai/julian-nalenz.js in a separate tab.
-8. Choose the "queue email" block from the "Divizend (Julian Nalenz)" section, try it and see how the queued email shows up in the admin interface.
+4. Run `bun run dev`
+5. Visit http://localhost:3000 and click on "Admin interface", send a token to your email address and enter it.
+6. Click on "Open in Scratch" to launch Scratch.
+7. Choose the "queue email" block from the e.g. "Divizend (Julian Nalenz)" section, try it and see how the queued email shows up in the admin interface.
 
 ## Setting up GSuite
 
 ### Making the admin user an organization admin
 
 1. Go to https://console.cloud.google.com/iam-admin/iam
-2. Make sure that not a project is selected, but instead the organization (i.e. the heading of the page should be something like `Permissions for organization "theborderland.se"` and the URL should contain something like `&organizationId=475226626272`)
+2. Make sure that not a project is selected, but instead the organization (i.e. the heading of the page should be something like `Permissions for organization "divizend.com"` and the URL should contain something like `&organizationId=475226626272`)
 3. Click on "Grant access"
 4. In the "New principals" field, enter the email address of the organization's admin.
 5. Under "Select a role", choose `Organization Policy Administrator`.
@@ -66,5 +65,5 @@ GCP_ADMIN_USER_DIVIZEND=your.name@divizend.com
 ### Enabling SDKs
 
 1. Enable the Admin SDK API: https://console.cloud.google.com/apis/library/admin.googleapis.com?project=api-project-319594010490
-2. Enable the Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=the-borderland
+2. Enable the Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=divizend
 3. Enable the Google Docs API: https://console.developers.google.com/apis/api/docs.googleapis.com/overview?project=319594010490
