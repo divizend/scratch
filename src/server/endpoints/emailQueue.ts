@@ -1,5 +1,5 @@
 import { ScratchEndpointDefinition } from "../scratch";
-import { getUniverse } from "../universe";
+import { UniverseModule } from "../../core";
 
 // Email queue endpoints
 export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
@@ -41,14 +41,8 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error(`Invalid email address: ${from}`);
       }
 
-      // Get universe and email queue
-      const universe = getUniverse();
-      if (!universe || !universe.emailQueue) {
-        throw new Error("Email queue not available");
-      }
-
       // Validate domain using the email queue
-      const isValidDomain = await universe.emailQueue.validateDomain(
+      const isValidDomain = await context.universe!.emailQueue.validateDomain(
         fromDomain
       );
       if (!isValidDomain) {
@@ -58,7 +52,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       }
 
       // Queue the email - routing will happen when sending
-      const queuedEmail = universe.emailQueue.add({
+      const queuedEmail = context.universe!.emailQueue.add({
         from,
         to,
         subject,
@@ -71,6 +65,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         message: "Email queued",
       };
     },
+    requiredModules: [UniverseModule.EmailQueue],
   },
 
   // Get email queue
@@ -82,12 +77,9 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.emailQueue) {
-        return [];
-      }
-      return universe.emailQueue.getAll();
+      return context.universe!.emailQueue.getAll();
     },
+    requiredModules: [UniverseModule.EmailQueue],
   },
 
   // Clear email queue
@@ -99,13 +91,10 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.emailQueue) {
-        throw new Error("Email queue not available");
-      }
-      universe.emailQueue.clear();
+      context.universe!.emailQueue.clear();
       return { success: true, message: "Email queue cleared" };
     },
+    requiredModules: [UniverseModule.EmailQueue],
   },
 
   // Send all emails
@@ -117,17 +106,13 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.emailQueue) {
-        throw new Error("Email queue not available");
-      }
-
-      if (universe.emailQueue.getIsSending()) {
+      if (context.universe!.emailQueue.getIsSending()) {
         throw new Error("Email sending already in progress");
       }
 
-      return await universe.emailQueue.send(null);
+      return await context.universe!.emailQueue.send(null);
     },
+    requiredModules: [UniverseModule.EmailQueue],
   },
 
   // Send selected emails
@@ -144,12 +129,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.emailQueue) {
-        throw new Error("Email queue not available");
-      }
-
-      if (universe.emailQueue.getIsSending()) {
+      if (context.universe!.emailQueue.getIsSending()) {
         throw new Error("Email sending already in progress");
       }
 
@@ -160,8 +140,9 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error("Invalid or empty ids array");
       }
 
-      return await universe.emailQueue.send(idsArray);
+      return await context.universe!.emailQueue.send(idsArray);
     },
+    requiredModules: [UniverseModule.EmailQueue],
   },
 
   // Remove selected emails
@@ -178,11 +159,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.emailQueue) {
-        throw new Error("Email queue not available");
-      }
-
       const { ids } = context.validatedBody || {};
       const idsArray = JSON.parse(ids);
 
@@ -190,12 +166,13 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error("Invalid or empty ids array");
       }
 
-      const removed = universe.emailQueue.removeByIds(idsArray);
+      const removed = context.universe!.emailQueue.removeByIds(idsArray);
       return {
         success: true,
         removed,
         message: `Removed ${removed} email(s)`,
       };
     },
+    requiredModules: [UniverseModule.EmailQueue],
   },
 ];

@@ -34,13 +34,21 @@ export class Resend {
 
   /**
    * Creates a new Resend instance
+   * Automatically reads API key from RESEND_API_KEY environment variable
+   * and API root from RESEND_API_ROOT (defaults to "api.resend.com")
    *
-   * @param apiKey - Resend API key
-   * @param apiRoot - Resend API root URL (e.g., "api.resend.com")
+   * @param apiKey - Optional Resend API key (overrides RESEND_API_KEY env var)
+   * @param apiRoot - Optional Resend API root URL (overrides RESEND_API_ROOT env var, defaults to "api.resend.com")
+   * @throws Error if API key is not provided and RESEND_API_KEY is not set
    */
-  constructor(apiKey: string, apiRoot: string = "api.resend.com") {
-    this.apiKey = apiKey;
-    this.apiRoot = apiRoot;
+  constructor(apiKey?: string, apiRoot?: string) {
+    this.apiKey = apiKey || process.env.RESEND_API_KEY || "";
+    if (!this.apiKey) {
+      throw new Error(
+        "Resend API key is required. Provide it via constructor parameter or RESEND_API_KEY environment variable."
+      );
+    }
+    this.apiRoot = apiRoot || process.env.RESEND_API_ROOT || "api.resend.com";
   }
 
   /**

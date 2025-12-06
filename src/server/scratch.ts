@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwtAuth } from "./auth";
+import { Universe, UniverseModule } from "../core";
 
 export interface ScratchBlock {
   opcode: string;
@@ -16,6 +17,7 @@ export interface ScratchBlock {
 export interface ScratchContext {
   userEmail?: string;
   validatedBody?: any; // Validated request body (set after validation middleware)
+  universe?: Universe | null; // Universe instance (set by context middleware)
   // Add any other context properties that should be shared between block and handler
 }
 
@@ -30,6 +32,8 @@ export interface ScratchEndpointDefinition {
   block: (context: ScratchContext) => Promise<ScratchBlock>;
   handler: (context: ScratchContext) => Promise<any>;
   noAuth?: boolean;
+  /** Array of required Universe modules that must be initialized before handler execution */
+  requiredModules?: UniverseModule[];
 }
 
 // Registry of Scratch endpoints
@@ -114,10 +118,12 @@ export async function registerScratchEndpoint(
     block,
     handler,
     noAuth = false,
+    requiredModules = [],
   }: {
     block: (context: ScratchContext) => Promise<ScratchBlock>;
     handler: (context: ScratchContext) => Promise<any>;
     noAuth?: boolean;
+    requiredModules?: UniverseModule[];
   }
 ) {
   // Build middleware array conditionally
@@ -142,8 +148,12 @@ export async function registerScratchEndpoint(
       // Ignore errors, userEmail will remain undefined
     }
 
+    // Get universe instance
+    const { getUniverse } = await import("./universe");
+    const universe = getUniverse();
+
     // Create context
-    const context: ScratchContext = { userEmail };
+    const context: ScratchContext = { userEmail, universe };
     c.scratchContext = context;
 
     // Get block definition from function (await since it returns a Promise)
@@ -157,6 +167,42 @@ export async function registerScratchEndpoint(
     middlewares.push(jwtAuth);
   }
   middlewares.push(contextMiddleware);
+
+  // Module validation middleware - ensures universe is available and required modules are initialized
+  const moduleValidationMiddleware = async (c: any, next: any) => {
+    const context = c.scratchContext;
+
+    // First check if universe is available
+    if (!context.universe) {
+      return c.json(
+        {
+          error: "Universe not initialized",
+        },
+        503
+      );
+    }
+
+    // Then check if required modules are available
+    if (requiredModules.length > 0) {
+      const missingModules = requiredModules.filter(
+        (module) => !context.universe!.hasModule(module)
+      );
+      if (missingModules.length > 0) {
+        return c.json(
+          {
+            error: `Required modules not available: ${missingModules.join(
+              ", "
+            )}`,
+            missingModules: missingModules,
+          },
+          503
+        );
+      }
+    }
+
+    await next();
+  };
+  middlewares.push(moduleValidationMiddleware);
 
   // Create validation middleware that uses the block from context
   const validationMiddleware = async (c: any, next: any) => {
@@ -218,6 +264,13 @@ export async function registerScratchEndpoints(
   endpoints: ScratchEndpointDefinition[]
 ) {
   await Promise.all(
-    endpoints.map((endpoint) => registerScratchEndpoint(app, endpoint))
+    endpoints.map((endpoint) =>
+      registerScratchEndpoint(app, {
+        block: endpoint.block,
+        handler: endpoint.handler,
+        noAuth: endpoint.noAuth,
+        requiredModules: endpoint.requiredModules,
+      })
+    )
   );
 }

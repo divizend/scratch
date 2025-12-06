@@ -31,6 +31,18 @@ import {
   Resend,
 } from "..";
 
+/**
+ * Enumeration of available Universe modules
+ */
+export enum UniverseModule {
+  /** GSuite integration for Gmail and Google Workspace services */
+  GSuite = "gsuite",
+  /** Resend email service integration */
+  Resend = "resend",
+  /** Email queue for managing and sending emails */
+  EmailQueue = "emailQueue",
+}
+
 export class Universe {
   /** GSuite integration for Gmail and Google Workspace services */
   public gsuite!: GSuite;
@@ -63,11 +75,15 @@ export class Universe {
 
     universe.gsuite = gsuite!;
 
-    // Initialize Resend
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (resendApiKey) {
-      const resendApiRoot = process.env.RESEND_API_ROOT || "api.resend.com";
-      universe.resend = new Resend(resendApiKey, resendApiRoot);
+    // Initialize Resend (constructor reads from environment variables)
+    try {
+      universe.resend = new Resend();
+    } catch (error) {
+      // Resend not configured - this is optional, so we continue without it
+      console.warn(
+        "Resend not initialized:",
+        error instanceof Error ? error.message : String(error)
+      );
     }
 
     // Initialize email queue with profiles
@@ -163,6 +179,33 @@ export class Universe {
    * @returns Promise<Fragment> - The requested fragment instance
    * @throws Error if the URI type is unknown or fragment creation fails
    */
+  /**
+   * Check if a specific module is available in this Universe instance
+   * @param module - The module to check
+   * @returns true if the module is available, false otherwise
+   */
+  hasModule(module: UniverseModule): boolean {
+    switch (module) {
+      case UniverseModule.GSuite:
+        return !!this.gsuite;
+      case UniverseModule.Resend:
+        return !!this.resend;
+      case UniverseModule.EmailQueue:
+        return !!this.emailQueue;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Check if all specified modules are available
+   * @param modules - Array of modules to check
+   * @returns true if all modules are available, false otherwise
+   */
+  hasModules(modules: UniverseModule[]): boolean {
+    return modules.every((module) => this.hasModule(module));
+  }
+
   async getFragment(uri: string): Promise<Fragment> {
     const parsedUri = URI.fromString(uri);
 

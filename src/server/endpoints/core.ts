@@ -1,6 +1,6 @@
 import { ScratchEndpointDefinition } from "../scratch";
 import { signJwtToken } from "../auth";
-import { getUniverse } from "../universe";
+import { UniverseModule } from "../../core";
 
 // Core and authentication endpoints
 export const coreEndpoints: ScratchEndpointDefinition[] = [
@@ -13,13 +13,8 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.gsuite) {
-        return [];
-      }
-
       try {
-        const orgConfigs = (universe.gsuite as any).orgConfigs;
+        const orgConfigs = (context.universe!.gsuite as any).orgConfigs;
         if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
           return [];
         }
@@ -39,6 +34,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       }
     },
     noAuth: true,
+    requiredModules: [UniverseModule.GSuite],
   },
 
   // Send JWT token via email
@@ -56,14 +52,9 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     }),
     handler: async (context) => {
       const { email } = context.validatedBody || {};
-      const universe = getUniverse();
-
-      if (!universe || !universe.gsuite) {
-        throw new Error("Google Workspace not connected");
-      }
 
       // Validate email domain
-      const orgConfigs = (universe.gsuite as any).orgConfigs;
+      const orgConfigs = (context.universe!.gsuite as any).orgConfigs;
       if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
         throw new Error("No GSuite organizations configured");
       }
@@ -88,11 +79,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       const jwt = await signJwtToken({ email });
 
       // Send email via Resend
-      if (!universe.resend) {
-        throw new Error("Resend not configured");
-      }
-
-      const response = await universe.resend.sendEmail({
+      const response = await context.universe!.resend!.sendEmail({
         from: "jwt-issuer@divizend.ai",
         to: email,
         subject: "Admin Access Token",
@@ -106,6 +93,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       return { success: true, message: "JWT token sent successfully" };
     },
     noAuth: true,
+    requiredModules: [UniverseModule.GSuite, UniverseModule.Resend],
   },
 
   // Get current user email
@@ -130,17 +118,8 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.gsuite) {
-        return {
-          status: "error",
-          message: "Universe not initialized",
-          connected: false,
-        };
-      }
-
       try {
-        const orgConfigs = (universe.gsuite as any).orgConfigs;
+        const orgConfigs = (context.universe!.gsuite as any).orgConfigs;
         if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
           return {
             status: "error",
@@ -151,7 +130,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
 
         const firstOrg = Object.keys(orgConfigs)[0];
         const orgConfig = orgConfigs[firstOrg];
-        const gsuiteUser = universe.gsuite.user(orgConfig.adminUser);
+        const gsuiteUser = context.universe!.gsuite.user(orgConfig.adminUser);
         const admin = gsuiteUser.admin();
 
         await admin.getDomains();
@@ -170,5 +149,6 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
         };
       }
     },
+    requiredModules: [UniverseModule.GSuite],
   },
 ];

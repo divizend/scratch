@@ -1,5 +1,5 @@
 import { ScratchEndpointDefinition } from "../scratch";
-import { getUniverse } from "../universe";
+import { UniverseModule } from "../../core";
 
 // GSuite endpoints
 export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
@@ -13,13 +13,12 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.gsuite || !context.userEmail) {
+      if (!context.userEmail) {
         return [];
       }
 
       try {
-        const gsuiteUser = universe.gsuite.user(context.userEmail);
+        const gsuiteUser = context.universe!.gsuite.user(context.userEmail);
         const admin = gsuiteUser.admin();
         const users = await admin.getUsers();
         return users.map((user) => ({
@@ -30,6 +29,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         return [];
       }
     },
+    requiredModules: [UniverseModule.GSuite],
   },
 
   // Gmail endpoints
@@ -47,16 +47,15 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const universe = getUniverse();
       const { userEmail } = context.validatedBody || {};
       const email = userEmail || context.userEmail;
 
-      if (!universe || !universe.gsuite || !email) {
+      if (!email) {
         return [];
       }
 
       try {
-        const gsuiteUser = universe.gsuite.user(email);
+        const gsuiteUser = context.universe!.gsuite.user(email);
         const gmail = gsuiteUser.gmail();
         const labels = await gmail.getLabels();
         return labels.map((label) => ({
@@ -67,6 +66,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         return [];
       }
     },
+    requiredModules: [UniverseModule.GSuite],
   },
 
   // List Gmail messages
@@ -91,16 +91,15 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const universe = getUniverse();
       const { label, limit, userEmail } = context.validatedBody || {};
       const email = userEmail || context.userEmail;
 
-      if (!universe || !universe.gsuite || !email) {
+      if (!email) {
         return [];
       }
 
       try {
-        const gsuiteUser = universe.gsuite.user(email);
+        const gsuiteUser = context.universe!.gsuite.user(email);
         const gmail = gsuiteUser.gmail();
         const limitNum = parseInt(limit || "10", 10) || 10;
         const labelFilter = label && label.trim() ? label.trim() : undefined;
@@ -124,6 +123,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         return [];
       }
     },
+    requiredModules: [UniverseModule.GSuite],
   },
 
   // Drive endpoints
@@ -149,11 +149,8 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const universe = getUniverse();
-      if (!universe || !universe.gsuite || !context.userEmail) {
-        throw new Error(
-          "Google Workspace not connected or user not authenticated"
-        );
+      if (!context.userEmail) {
+        throw new Error("User not authenticated");
       }
 
       const { sourceFileId, destFolderId, name } = context.validatedBody || {};
@@ -162,7 +159,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       }
 
       try {
-        const gsuiteUser = universe.gsuite.user(context.userEmail);
+        const gsuiteUser = context.universe!.gsuite.user(context.userEmail);
         const drive = gsuiteUser.drive();
         const newFile = await drive.copyFile({
           sourceFileId,
@@ -180,5 +177,6 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         );
       }
     },
+    requiredModules: [UniverseModule.GSuite],
   },
 ];
