@@ -33,7 +33,7 @@ export class Documents {
    * @param universe - Reference to the central Universe instance
    * @param auth - JWT authentication for Docs access
    */
-  constructor(private readonly universe: Universe, private auth: JWT) {
+  constructor(public readonly universe: Universe, public readonly auth: JWT) {
     this.docs = google.docs({ version: "v1", auth: this.auth });
   }
 

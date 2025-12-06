@@ -1,5 +1,6 @@
 import { ScratchEndpointDefinition } from "../scratch";
 import { UniverseModule } from "../../core";
+import { extractFileId } from "../../gsuite/utils";
 
 // GSuite endpoints
 export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
@@ -132,12 +133,12 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         sourceFileId: {
           type: "string",
           default: "",
-          description: "Source Google Drive file ID",
+          description: "Source Google Drive file ID or URL",
         },
         destFolderId: {
           type: "string",
           default: "",
-          description: "Destination folder ID",
+          description: "Destination folder ID or URL",
         },
         name: {
           type: "string",
@@ -150,11 +151,15 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       const { sourceFileId, destFolderId, name } = context.validatedBody!;
 
       try {
-        const gsuiteUser = context.universe!.gsuite.user(context.userEmail);
+        // Extract file IDs from URLs if needed
+        const extractedSourceId = extractFileId(sourceFileId);
+        const extractedDestId = extractFileId(destFolderId);
+
+        const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
         const drive = gsuiteUser.drive();
         const newFile = await drive.copyFile({
-          sourceFileId,
-          destFolderId,
+          sourceFileId: extractedSourceId,
+          destFolderId: extractedDestId,
           name,
         });
         return {
@@ -165,6 +170,161 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       } catch (error) {
         throw new Error(
           error instanceof Error ? error.message : "Failed to copy Drive file"
+        );
+      }
+    },
+    requiredModules: [UniverseModule.GSuite],
+  },
+
+  // Documents endpoints
+  // Get Google Doc as HTML
+  {
+    block: async (context) => ({
+      opcode: "getDocAsHTML",
+      blockType: "reporter",
+      text: "Google Doc as HTML from [documentId]",
+      schema: {
+        documentId: {
+          type: "string",
+          default: "",
+          description: "Google Docs document ID or URL",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { documentId } = context.validatedBody!;
+
+      try {
+        // Extract file ID from URL if needed
+        const extractedId = extractFileId(documentId);
+
+        const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
+        const documents = gsuiteUser.documents();
+        const doc = await documents.open(extractedId);
+        const html = await doc.toHTML();
+        return html;
+      } catch (error) {
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : "Failed to get document as HTML"
+        );
+      }
+    },
+    requiredModules: [UniverseModule.GSuite],
+  },
+
+  // Spreadsheets endpoints
+  // Get all values from column A of a spreadsheet
+  {
+    block: async (context) => ({
+      opcode: "getSpreadsheetColumnA",
+      blockType: "reporter",
+      text: "all values from column A in spreadsheet [spreadsheetId]",
+      schema: {
+        spreadsheetId: {
+          type: "string",
+          default: "",
+          description: "Google Sheets spreadsheet ID or URL",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { spreadsheetId } = context.validatedBody!;
+
+      try {
+        // Extract file ID from URL if needed
+        const extractedId = extractFileId(spreadsheetId);
+
+        const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
+        const spreadsheets = gsuiteUser.spreadsheets();
+        const spreadsheet = await spreadsheets.open(extractedId);
+
+        // Get the first sheet (or default sheet)
+        const firstSheet = spreadsheet.sheets[0];
+        if (!firstSheet) {
+          throw new Error("Spreadsheet has no sheets");
+        }
+
+        // Get all values from column A
+        const columnValues = await firstSheet.getColumn("A");
+
+        // Extract the values array from SheetValues
+        // Since values is private, we'll use the API directly
+        const valuesResponse =
+          await spreadsheets.sheets.spreadsheets.values.get({
+            spreadsheetId: extractedId,
+            range: `${firstSheet.name}!A:A`,
+          });
+
+        const values = valuesResponse.data.values || [];
+
+        // Flatten the 2D array to 1D array (each row in column A becomes one element)
+        return values
+          .map((row) => (row && row[0] ? row[0] : ""))
+          .filter((val) => val !== "");
+      } catch (error) {
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : "Failed to get spreadsheet column A values"
+        );
+      }
+    },
+    requiredModules: [UniverseModule.GSuite],
+  },
+
+  // Get value from cell A1
+  {
+    block: async (context) => ({
+      opcode: "getSpreadsheetCellA1",
+      blockType: "reporter",
+      text: "value from cell A1 in spreadsheet [spreadsheetId]",
+      schema: {
+        spreadsheetId: {
+          type: "string",
+          default: "",
+          description: "Google Sheets spreadsheet ID or URL",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { spreadsheetId } = context.validatedBody!;
+
+      try {
+        // Extract file ID from URL if needed
+        const extractedId = extractFileId(spreadsheetId);
+
+        const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
+        const spreadsheets = gsuiteUser.spreadsheets();
+        const spreadsheet = await spreadsheets.open(extractedId);
+
+        // Get the first sheet (or default sheet)
+        const firstSheet = spreadsheet.sheets[0];
+        if (!firstSheet) {
+          throw new Error("Spreadsheet has no sheets");
+        }
+
+        // Get value from cell A1
+        const valuesResponse =
+          await spreadsheets.sheets.spreadsheets.values.get({
+            spreadsheetId: extractedId,
+            range: `${firstSheet.name}!A1`,
+          });
+
+        const values = valuesResponse.data.values;
+
+        // Return the value from A1 as a string, or empty string if cell is empty
+        if (values && values.length > 0 && values[0] && values[0][0]) {
+          return String(values[0][0]);
+        }
+
+        return "";
+      } catch (error) {
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : "Failed to get spreadsheet cell A1 value"
         );
       }
     },

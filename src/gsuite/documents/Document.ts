@@ -95,4 +95,34 @@ export class Document {
       },
     });
   }
+
+  /**
+   * Exports the document as HTML
+   *
+   * This method uses the Google Drive API to export the document
+   * as HTML directly, returning it exactly as exported by the API.
+   *
+   * @returns Promise<string> - Document content as HTML
+   * @throws Error if export fails
+   */
+  async toHTML(): Promise<string> {
+    // Get the Drive service from the Documents instance
+    const userEmail = this.docs.auth.subject!;
+    const gsuiteUser = this.docs.universe.gsuite.user(userEmail);
+    const drive = gsuiteUser.drive();
+
+    // Export as HTML via Drive API
+    const htmlBuffer = await drive.drive.files.export(
+      {
+        fileId: this.id,
+        mimeType: "text/html",
+      },
+      { responseType: "arraybuffer" }
+    );
+
+    const html = Buffer.from(htmlBuffer.data as any).toString("utf-8");
+
+    // Return the HTML exactly as exported by the API
+    return html;
+  }
 }
