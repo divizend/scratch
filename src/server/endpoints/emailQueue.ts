@@ -29,11 +29,7 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { from, to, subject, content } = context.validatedBody || {};
-
-      if (!from || !to || !subject || !content) {
-        throw new Error("from, to, subject, and content are required");
-      }
+      const { from, to, subject, content } = context.validatedBody!;
 
       // Extract domain from "from" email address
       const fromDomain = from.split("@")[1];
@@ -133,10 +129,10 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
         throw new Error("Email sending already in progress");
       }
 
-      const { ids } = context.validatedBody || {};
+      const { ids } = context.validatedBody!;
       const idsArray = JSON.parse(ids);
 
-      if (!idsArray || !Array.isArray(idsArray) || idsArray.length === 0) {
+      if (!Array.isArray(idsArray) || idsArray.length === 0) {
         throw new Error("Invalid or empty ids array");
       }
 
@@ -159,10 +155,10 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { ids } = context.validatedBody || {};
+      const { ids } = context.validatedBody!;
       const idsArray = JSON.parse(ids);
 
-      if (!idsArray || !Array.isArray(idsArray) || idsArray.length === 0) {
+      if (!Array.isArray(idsArray) || idsArray.length === 0) {
         throw new Error("Invalid or empty ids array");
       }
 

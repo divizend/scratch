@@ -51,7 +51,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { email } = context.validatedBody || {};
+      const { email } = context.validatedBody!;
 
       // Validate email domain
       const orgConfigs = (context.universe!.gsuite as any).orgConfigs;

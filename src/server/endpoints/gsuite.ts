@@ -47,8 +47,8 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { userEmail } = context.validatedBody || {};
-      const email = userEmail || context.userEmail;
+      const { userEmail } = context.validatedBody!;
+      const email = userEmail;
 
       if (!email) {
         return [];
@@ -91,8 +91,8 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { label, limit, userEmail } = context.validatedBody || {};
-      const email = userEmail || context.userEmail;
+      const { label, limit, userEmail } = context.validatedBody!;
+      const email = userEmail;
 
       if (!email) {
         return [];
@@ -153,10 +153,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         throw new Error("User not authenticated");
       }
 
-      const { sourceFileId, destFolderId, name } = context.validatedBody || {};
-      if (!sourceFileId || !destFolderId || !name) {
-        throw new Error("sourceFileId, destFolderId, and name are required");
-      }
+      const { sourceFileId, destFolderId, name } = context.validatedBody!;
 
       try {
         const gsuiteUser = context.universe!.gsuite.user(context.userEmail);

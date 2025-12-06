@@ -73,18 +73,36 @@ function validateArguments(block: ScratchBlock) {
       const errors: string[] = [];
       const validatedBody: any = { ...data };
 
-      // Check all arguments defined in the block
+      // Check all arguments defined in the block - ALL arguments are required
       if (block.arguments) {
         for (const [key, arg] of Object.entries(block.arguments)) {
-          // If argument is missing
-          if (!(key in validatedBody) || validatedBody[key] === undefined) {
-            // If it has a default value, apply it
-            if (arg.defaultValue !== undefined) {
-              validatedBody[key] = arg.defaultValue;
-            } else {
-              // Otherwise, it's required and missing
-              errors.push(`Missing required parameter: ${key}`);
+          // Check if argument is missing or empty
+          if (
+            !(key in validatedBody) ||
+            validatedBody[key] === undefined ||
+            validatedBody[key] === null ||
+            validatedBody[key] === ""
+          ) {
+            // All arguments are required - no optional arguments allowed
+            errors.push(`Missing required parameter: ${key}`);
+          } else {
+            // Type validation
+            if (arg.type === "number") {
+              const num = Number(validatedBody[key]);
+              if (isNaN(num)) {
+                errors.push(`Parameter ${key} must be a number`);
+              } else {
+                validatedBody[key] = num;
+              }
+            } else if (arg.type === "boolean") {
+              const val = validatedBody[key];
+              if (typeof val === "string") {
+                validatedBody[key] = val === "true" || val === "1";
+              } else {
+                validatedBody[key] = Boolean(val);
+              }
             }
+            // string type doesn't need conversion
           }
         }
       }
@@ -207,12 +225,18 @@ export async function registerScratchEndpoint(
   // Create validation middleware that uses the block from context
   const validationMiddleware = async (c: any, next: any) => {
     const blockDef = c.scratchBlock;
-    // Call validation middleware
-    await validateArguments(blockDef)(c, async () => {
-      // After validation, add validatedBody to context
+
+    // Call validation middleware - it will return a Response if validation fails
+    // We need to wrap next() to add validatedBody to context after validation passes
+    const result = await validateArguments(blockDef)(c, async () => {
+      // Validation passed - add validatedBody to context before continuing
       c.scratchContext.validatedBody = c.validatedBody;
       await next();
     });
+
+    // If validation failed, validateArguments returned a Response - return it to stop the chain
+    // If validation passed, result will be undefined (next() was called) and we continue
+    return result;
   };
   middlewares.push(validationMiddleware);
 
