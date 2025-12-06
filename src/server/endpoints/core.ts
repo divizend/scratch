@@ -244,7 +244,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {
         label: {
           type: "string",
-          defaultValue: "",
+          defaultValue: "INBOX",
         },
         limit: {
           type: "string",
@@ -268,7 +268,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
         let count = 0;
         for await (const message of gmail.listMessages(labelFilter, {
           limit: limitNum,
-          full: false,
+          full: true,
         })) {
           messages.push({
             id: message.message.id,
