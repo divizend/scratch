@@ -81,20 +81,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
     requiredModules: [UniverseModule.EmailQueue],
   },
 
-  // Get email queue length
-  {
-    block: async (context) => ({
-      opcode: "getEmailQueueLength",
-      blockType: "reporter",
-      text: "email queue length",
-    }),
-    handler: async (context) => {
-      const queue = context.universe!.emailQueue.getAll();
-      return String(queue.length);
-    },
-    requiredModules: [UniverseModule.EmailQueue],
-  },
-
   // Clear email queue
   {
     block: async (context) => ({
