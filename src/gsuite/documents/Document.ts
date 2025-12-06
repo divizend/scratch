@@ -97,6 +97,37 @@ export class Document {
   }
 
   /**
+   * Exports the document in the specified format
+   *
+   * This method uses the Google Drive API to export the document
+   * in the requested format, returning it exactly as exported by the API.
+   *
+   * @param mimeType - MIME type for export (e.g., "text/html", "text/plain")
+   * @returns Promise<string> - Document content in the requested format
+   * @throws Error if export fails
+   */
+  async export(mimeType: string): Promise<string> {
+    // Get the Drive service from the Documents instance
+    const userEmail = this.docs.auth.subject!;
+    const gsuiteUser = this.docs.universe.gsuite.user(userEmail);
+    const drive = gsuiteUser.drive();
+
+    // Export via Drive API
+    const buffer = await drive.drive.files.export(
+      {
+        fileId: this.id,
+        mimeType,
+      },
+      { responseType: "arraybuffer" }
+    );
+
+    const content = Buffer.from(buffer.data as any).toString("utf-8");
+
+    // Return the content exactly as exported by the API
+    return content;
+  }
+
+  /**
    * Exports the document as HTML
    *
    * This method uses the Google Drive API to export the document
@@ -106,23 +137,19 @@ export class Document {
    * @throws Error if export fails
    */
   async toHTML(): Promise<string> {
-    // Get the Drive service from the Documents instance
-    const userEmail = this.docs.auth.subject!;
-    const gsuiteUser = this.docs.universe.gsuite.user(userEmail);
-    const drive = gsuiteUser.drive();
+    return this.export("text/html");
+  }
 
-    // Export as HTML via Drive API
-    const htmlBuffer = await drive.drive.files.export(
-      {
-        fileId: this.id,
-        mimeType: "text/html",
-      },
-      { responseType: "arraybuffer" }
-    );
-
-    const html = Buffer.from(htmlBuffer.data as any).toString("utf-8");
-
-    // Return the HTML exactly as exported by the API
-    return html;
+  /**
+   * Exports the document as plain text
+   *
+   * This method uses the Google Drive API to export the document
+   * as plain text directly, returning it exactly as exported by the API.
+   *
+   * @returns Promise<string> - Document content as plain text
+   * @throws Error if export fails
+   */
+  async toPlainText(): Promise<string> {
+    return this.export("text/plain");
   }
 }

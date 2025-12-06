@@ -7,6 +7,8 @@
  * @version 1.0.0
  */
 
+import { GSuiteUser, Document, Spreadsheet, Sheet, Spreadsheets } from "../..";
+
 /**
  * Extracts a Google Drive/Docs file ID from a URL or returns the input if it's already a file ID
  *
@@ -57,4 +59,42 @@ export function extractFileId(urlOrId: string): string {
 
   // If no pattern matches, assume it's a file ID (might be invalid, but let the API handle it)
   return urlOrId;
+}
+
+/**
+ * Opens a Google Doc by ID or URL
+ *
+ * @param gsuiteUser - GSuite user instance
+ * @param documentIdOrUrl - Document ID or URL
+ * @returns Promise<Document> - Opened document instance
+ */
+export async function openDocument(
+  gsuiteUser: GSuiteUser,
+  documentIdOrUrl: string
+): Promise<Document> {
+  const extractedId = extractFileId(documentIdOrUrl);
+  const documents = gsuiteUser.documents();
+  return documents.open(extractedId);
+}
+
+/**
+ * Opens a spreadsheet and returns the first sheet
+ *
+ * @param gsuiteUser - GSuite user instance
+ * @param spreadsheetIdOrUrl - Spreadsheet ID or URL
+ * @returns Promise with spreadsheet and first sheet
+ * @throws Error if spreadsheet has no sheets
+ */
+export async function openSpreadsheetFirstSheet(
+  gsuiteUser: GSuiteUser,
+  spreadsheetIdOrUrl: string
+): Promise<{ spreadsheet: Spreadsheet; sheet: Sheet; spreadsheets: Spreadsheets }> {
+  const extractedId = extractFileId(spreadsheetIdOrUrl);
+  const spreadsheets = gsuiteUser.spreadsheets();
+  const spreadsheet = await spreadsheets.open(extractedId);
+  const firstSheet = spreadsheet.sheets[0];
+  if (!firstSheet) {
+    throw new Error("Spreadsheet has no sheets");
+  }
+  return { spreadsheet, sheet: firstSheet, spreadsheets };
 }
