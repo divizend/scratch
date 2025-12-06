@@ -1,6 +1,7 @@
 import { ScratchEndpointDefinition } from "../scratch";
 import { signJwtToken } from "../auth";
 import { UniverseModule } from "../../core";
+import Mustache from "mustache";
 
 // Core and authentication endpoints
 export const coreEndpoints: ScratchEndpointDefinition[] = [
@@ -148,5 +149,49 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       }
     },
     requiredModules: [UniverseModule.GSuite],
+  },
+
+  // Template rendering
+  {
+    block: async (context) => ({
+      opcode: "renderTemplate",
+      blockType: "reporter",
+      text: "render template [template] with data [data]",
+      schema: {
+        template: {
+          type: "string",
+          default: "Hello, {{name}}!",
+          description: "Mustache template string",
+        },
+        data: {
+          type: "string",
+          default: '{"name": "World"}',
+          description: "JSON object with template data",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { template, data } = context.validatedBody!;
+
+      try {
+        // Parse the data JSON string
+        let parsedData: any;
+        try {
+          parsedData = JSON.parse(data);
+        } catch (parseError) {
+          throw new Error(`Invalid JSON data: ${parseError instanceof Error ? parseError.message : "Unknown error"}`);
+        }
+
+        // Render the template using Mustache
+        const rendered = Mustache.render(template, parsedData);
+        return rendered;
+      } catch (error) {
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : "Failed to render template"
+        );
+      }
+    },
   },
 ];
