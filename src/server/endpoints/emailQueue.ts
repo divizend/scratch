@@ -102,10 +102,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      if (context.universe!.emailQueue.getIsSending()) {
-        throw new Error("Email sending already in progress");
-      }
-
       return await context.universe!.emailQueue.send(null);
     },
     requiredModules: [UniverseModule.EmailQueue],
@@ -125,10 +121,6 @@ export const emailQueueEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      if (context.universe!.emailQueue.getIsSending()) {
-        throw new Error("Email sending already in progress");
-      }
-
       const { ids } = context.validatedBody!;
       const idsArray = JSON.parse(ids);
 

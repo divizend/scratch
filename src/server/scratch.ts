@@ -250,6 +250,10 @@ export async function registerScratchEndpoint(
       if (result instanceof Response) {
         return result;
       }
+      // If handler returns a string, return as plain text
+      if (typeof result === "string") {
+        return c.text(result);
+      }
       // Otherwise, wrap in JSON response
       return c.json(result || { success: true });
     } catch (error) {

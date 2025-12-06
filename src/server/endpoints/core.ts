@@ -105,7 +105,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       arguments: {},
     }),
     handler: async (context) => {
-      return { email: context.userEmail || "Unknown" };
+      return context.userEmail || "Unknown";
     },
   },
 
