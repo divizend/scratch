@@ -67,3 +67,7 @@ GCP_ADMIN_USER_DIVIZEND=your.name@divizend.com
 1. Enable the Admin SDK API: https://console.cloud.google.com/apis/library/admin.googleapis.com?project=api-project-319594010490
 2. Enable the Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=divizend
 3. Enable the Google Docs API: https://console.developers.google.com/apis/api/docs.googleapis.com/overview?project=319594010490
+
+## Todo
+
+- add an interpreter for a new BASIC-like programming language which can be called like any other endpoint and which does endpoint calls as well as jumps and handling variables (goal: have a set of atomic core functionality, i.e. the main blocks, and then expressing all more high-level functionality in terms of those)
