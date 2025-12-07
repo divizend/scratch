@@ -9,14 +9,22 @@ import { setUniverse } from "./universe";
 // Re-export setUniverse for convenience
 export { setUniverse };
 
+// Store the endpoints array for reuse
+let allEndpoints: ScratchEndpointDefinition[] = [];
+
+// Get all registered endpoint definitions
+export function getAllEndpointDefinitions(): ScratchEndpointDefinition[] {
+  return [...allEndpoints];
+}
+
 // Register all Scratch endpoints
 export async function registerEndpoints(app: Hono) {
-  const endpoints: ScratchEndpointDefinition[] = [
+  allEndpoints = [
     ...coreEndpoints,
     ...emailQueueEndpoints,
     ...gsuiteEndpoints,
     ...streamstoreEndpoints,
   ];
 
-  await registerScratchEndpoints(app, endpoints);
+  await registerScratchEndpoints(app, allEndpoints);
 }

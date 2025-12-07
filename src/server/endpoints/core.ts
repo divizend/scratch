@@ -1,4 +1,5 @@
 import { ScratchEndpointDefinition } from "../scratch";
+import { getAllEndpointDefinitions } from "../endpoints";
 import { signJwtToken } from "../auth";
 import { UniverseModule } from "../../core";
 import Mustache from "mustache";
@@ -302,5 +303,42 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       const html = await marked(markdownText);
       return html;
     },
+  },
+
+  // List all endpoints
+  {
+    block: async (context) => ({
+      opcode: "listEndpoints",
+      blockType: "reporter",
+      text: "list all endpoints",
+    }),
+    handler: async (context) => {
+      const endpointDefinitions = getAllEndpointDefinitions();
+
+      // Resolve all block definitions
+      const resolvedEndpoints = await Promise.all(
+        endpointDefinitions.map(async (epDef) => {
+          const blockDef = await epDef.block(context);
+          const method = blockDef.blockType === "reporter" ? "GET" : "POST";
+          const endpoint = `/api/${blockDef.opcode}`;
+
+          return {
+            method,
+            path: endpoint,
+            opcode: blockDef.opcode,
+            blockType: blockDef.blockType,
+            text: blockDef.text,
+            schema: blockDef.schema,
+            requiresAuth: !epDef.noAuth,
+          };
+        })
+      );
+
+      return {
+        endpoints: resolvedEndpoints,
+        total: resolvedEndpoints.length,
+      };
+    },
+    noAuth: true,
   },
 ];
