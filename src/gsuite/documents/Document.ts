@@ -21,6 +21,7 @@
 
 import { docs_v1 } from "googleapis";
 import { Documents } from ".";
+import TurndownService from "turndown";
 
 /**
  * Mapping of placeholder keys to replacement values
@@ -151,5 +152,22 @@ export class Document {
    */
   async toPlainText(): Promise<string> {
     return this.export("text/plain");
+  }
+
+  /**
+   * Exports the document as Markdown
+   *
+   * This method exports the document as HTML first, then converts it
+   * to Markdown using Turndown. This provides a clean Markdown representation
+   * of the document content.
+   *
+   * @returns Promise<string> - Document content as Markdown
+   * @throws Error if export or conversion fails
+   */
+  async toMarkdown(): Promise<string> {
+    const html = await this.toHTML();
+    const turndownService = new TurndownService();
+    turndownService.remove(["script", "style"]);
+    return turndownService.turndown(html).trim();
   }
 }

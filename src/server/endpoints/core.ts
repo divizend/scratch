@@ -3,6 +3,7 @@ import { signJwtToken } from "../auth";
 import { UniverseModule } from "../../core";
 import Mustache from "mustache";
 import { JSONPath } from "jsonpath-plus";
+import { marked } from "marked";
 
 // Core and authentication endpoints
 export const coreEndpoints: ScratchEndpointDefinition[] = [
@@ -244,6 +245,28 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       const { array } = context.validatedBody!;
       // array is already parsed and validated as an array by the middleware
       return String(array.length);
+    },
+  },
+
+  // Convert Markdown to HTML
+  {
+    block: async (context) => ({
+      opcode: "markdownToHTML",
+      blockType: "reporter",
+      text: "Markdown to HTML from [markdown]",
+      schema: {
+        markdown: {
+          type: "string",
+          default:
+            "# Hello World\n\nThis is a **markdown** example with a [link](https://example.com).",
+          description: "Markdown text to convert to HTML",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { markdown } = context.validatedBody!;
+      const html = await marked(markdown);
+      return html;
     },
   },
 ];
