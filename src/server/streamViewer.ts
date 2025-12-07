@@ -182,4 +182,3 @@ export function renderStreamViewer(streamName: string): string {
 </body>
 </html>`;
 }
-
