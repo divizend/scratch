@@ -26,15 +26,13 @@ function toTitleCase(str: string): string {
 }
 
 // Generate extension ID and name from hyphenated name
-function generateExtensionInfo(name: string) {
+function generateExtensionInfo() {
   const orgName = envOrDefault(undefined, "ORG_NAME", "divizend");
   const orgNamePascal = orgName.charAt(0).toUpperCase() + orgName.slice(1);
-  const namePascal = hyphenatedToPascalCase(name);
-  const nameTitle = toTitleCase(name);
 
   return {
-    id: `${orgNamePascal}${namePascal}`,
-    displayName: `${orgNamePascal} (${nameTitle})`,
+    id: `${orgNamePascal}`,
+    displayName: `${orgNamePascal}`,
   };
 }
 
@@ -176,12 +174,9 @@ export function registerExtensionEndpoint(app: Hono) {
       return c.text("JWT token does not contain a valid email address", 400);
     }
 
-    // Convert email to hyphenated name (e.g., "julian.nalenz@divizend.com" -> "julian-nalenz")
-    const name = emailToHyphenatedName(email);
-
     // Generate extension ID and name from the email-derived name
     const { id: extensionId, displayName: extensionName } =
-      generateExtensionInfo(name);
+      generateExtensionInfo();
 
     // Determine the base URL for this request
     const baseUrl = getBaseUrl(c);
