@@ -10,6 +10,7 @@ import {
   registerStaticRoutes,
   getRegisteredEndpoints,
 } from "./src/server";
+import { renderStreamViewer } from "./src/server/streamViewer";
 import { envOrDefault } from "./src/core/Env";
 
 // Get the directory where this file is located
@@ -53,6 +54,19 @@ app.use("*", async (c, next) => {
 
 // Register static routes (README, admin interface)
 registerStaticRoutes(app, projectRoot);
+
+// Register stream viewer routes (e.g., /scratch-demo)
+app.get("/:streamName", async (c) => {
+  const streamName = c.req.param("streamName");
+
+  // Skip if it's a reserved route
+  if (["admin", "api", "extension"].includes(streamName)) {
+    return c.notFound();
+  }
+
+  // Serve the stream viewer HTML page
+  return c.html(renderStreamViewer(streamName));
+});
 
 // Register all Scratch endpoints and log them
 (async () => {
