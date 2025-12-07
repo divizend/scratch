@@ -190,7 +190,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       schema: {
         documentId: {
           type: "string",
-          default: "",
+          default: "https://docs.google.com/document/d/1f3fEhar6zNiuf61QG7wuRug9alZRsOafcPSHPbgivDE/edit",
           description: "Google Docs document ID or URL",
         },
       },
@@ -213,7 +213,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
       schema: {
         documentId: {
           type: "string",
-          default: "",
+          default: "https://docs.google.com/document/d/1f3fEhar6zNiuf61QG7wuRug9alZRsOafcPSHPbgivDE/edit",
           description: "Google Docs document ID or URL",
         },
       },
@@ -242,7 +242,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         },
         spreadsheetId: {
           type: "string",
-          default: "",
+          default: "https://docs.google.com/spreadsheets/d/1Y3uI9-Ps4HQYYYFKM7VWbayczngJXmAA6Ms3inEGIQQ/edit",
           description: "Google Sheets spreadsheet ID or URL",
         },
       },
@@ -278,7 +278,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         },
         spreadsheetId: {
           type: "string",
-          default: "",
+          default: "https://docs.google.com/spreadsheets/d/1Y3uI9-Ps4HQYYYFKM7VWbayczngJXmAA6Ms3inEGIQQ/edit",
           description: "Google Sheets spreadsheet ID or URL",
         },
       },
@@ -314,7 +314,7 @@ export const gsuiteEndpoints: ScratchEndpointDefinition[] = [
         },
         spreadsheetId: {
           type: "string",
-          default: "",
+          default: "https://docs.google.com/spreadsheets/d/1Y3uI9-Ps4HQYYYFKM7VWbayczngJXmAA6Ms3inEGIQQ/edit",
           description: "Google Sheets spreadsheet ID or URL",
         },
       },
