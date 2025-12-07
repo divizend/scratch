@@ -98,11 +98,34 @@ export class S2 {
   ): Promise<S2ReadResult> {
     const basin = this.client.basin(basinName);
     const stream = basin.stream(streamName);
-    const readBatch = await stream.read({ seq_num: 0, count: limit });
-    const records = ((readBatch as any).records || []).map((record: any) =>
-      this.parseRecordRaw(record)
-    );
-    return { records };
+    try {
+      const readBatch = await stream.read({ seq_num: 0, count: limit });
+      const records = ((readBatch as any).records || []).map((record: any) =>
+        this.parseRecordRaw(record)
+      );
+      return { records };
+    } catch (error: any) {
+      // Check if it's a stream not found error - re-throw so it can be handled as 404
+      const errorMessage =
+        error?.message || error?.data$?.message || String(error);
+      const status =
+        error?.status || error?.statusCode || error?.response?.status;
+      const code = error?.code || error?.data$?.code;
+
+      if (
+        status === 404 ||
+        code === "stream_not_found" ||
+        code === "not_found" ||
+        errorMessage.includes("not found") ||
+        errorMessage.includes("Stream not found")
+      ) {
+        // Re-throw stream not found errors so they can be handled as 404
+        throw error;
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   /**
@@ -117,32 +140,50 @@ export class S2 {
     const basin = this.client.basin(basinName);
     const stream = basin.stream(streamName);
 
-    // Get tail position (i.e. the _next_ sequence number)
-    const tailResponse = await stream.checkTail();
-    const tail = tailResponse.tail;
+    try {
+      // Get tail position (i.e. the _next_ sequence number)
+      const tailResponse = await stream.checkTail();
+      const tail = tailResponse.tail;
 
-    if (!tail || tail.seq_num === undefined || tail.seq_num < 0) {
-      console.warn(
-        `S2 stream ${streamName} in basin ${basinName} is in a bad state, with tail response ${JSON.stringify(
-          tailResponse
-        )}`
+      if (!tail || tail.seq_num === undefined || tail.seq_num < 0) {
+        return { records: [] };
+      }
+
+      const startSeq = Math.max(0, tail.seq_num - limit);
+      const count = Math.min(tail.seq_num, limit);
+
+      const readResult = await stream.read({
+        seq_num: startSeq,
+        count: count,
+      });
+
+      const records = ((readResult as any).records || []).map((record: any) =>
+        this.parseRecordRaw(record)
       );
-      return { records: [] };
+
+      return { records };
+    } catch (error: any) {
+      // Check if it's a stream not found error - re-throw so it can be handled as 404
+      const errorMessage =
+        error?.message || error?.data$?.message || String(error);
+      const status =
+        error?.status || error?.statusCode || error?.response?.status;
+      const code = error?.code || error?.data$?.code;
+
+      if (
+        status === 404 ||
+        code === "stream_not_found" ||
+        code === "not_found" ||
+        errorMessage.includes("not found") ||
+        errorMessage.includes("Stream not found")
+      ) {
+        // Re-throw stream not found errors so they can be handled as 404
+        throw error;
+      }
+
+      // Re-throw other errors
+      throw error;
     }
-
-    const startSeq = Math.max(0, tail.seq_num - limit);
-    const count = Math.min(tail.seq_num, limit);
-
-    const readResult = await stream.read({
-      seq_num: startSeq,
-      count: count,
-    });
-
-    const records = ((readResult as any).records || []).map((record: any) =>
-      this.parseRecordRaw(record)
-    );
-
-    return { records };
   }
 
   /**
