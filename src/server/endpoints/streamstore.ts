@@ -39,17 +39,12 @@ export const streamstoreEndpoints: ScratchEndpointDefinition[] = [
     block: async (context) => ({
       opcode: "appendToStream",
       blockType: "command",
-      text: "append to stream [streamName] event type [eventType] data [data]",
+      text: "append to stream [streamName] data [data]",
       schema: {
         streamName: {
           type: "string",
           default: "scratch-demo",
           description: "Name of the stream",
-        },
-        eventType: {
-          type: "string",
-          default: "com.s2.streamstore.message",
-          description: "CloudEvent type (e.g., com.example.event)",
         },
         data: {
           type: "json",
@@ -72,14 +67,9 @@ export const streamstoreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { streamName, eventType, data } = context.validatedBody!;
+      const { streamName, data } = context.validatedBody!;
       const basinName = S2.getBasin();
-      await context.universe!.s2!.appendToStream(
-        basinName,
-        streamName,
-        data,
-        eventType
-      );
+      await context.universe!.s2!.appendToStream(basinName, streamName, data);
       return {
         success: true,
         message: `Data appended to stream ${streamName} in basin ${basinName}`,

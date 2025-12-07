@@ -41,17 +41,38 @@ export class S2 {
   }
 
   /**
+   * Generates event type from HOSTED_AT and stream name
+   * Reverses the domain (e.g., "scratch.divizend.ai" -> "ai.divizend.scratch")
+   * and appends the stream name
+   */
+  private static getEventType(streamName: string): string {
+    const hostedAt = envOrDefault(
+      undefined,
+      "HOSTED_AT",
+      "scratch.divizend.ai"
+    );
+    // Remove protocol if present
+    const domain = hostedAt.replace(/^https?:\/\//, "");
+    // Reverse the domain parts
+    const reversed = domain.split(".").reverse().join(".");
+    // Append stream name
+    return `${reversed}.${streamName}`;
+  }
+
+  /**
    * Appends data to a stream
    * Automatically wraps the data in a CloudEvent with generated headers
    */
   async appendToStream(
     basinName: string,
     streamName: string,
-    data: any,
-    eventType: string
+    data: any
   ): Promise<void> {
     const basin = this.client.basin(basinName);
     const stream = basin.stream(streamName);
+
+    // Generate event type from HOSTED_AT and stream name
+    const eventType = S2.getEventType(streamName);
 
     // Create a CloudEvent with the payload
     const event = new CloudEvent({
@@ -179,6 +200,11 @@ export class S2 {
     basinName: string,
     streamName: string
   ): Promise<{ created: boolean; message: string }> {
+    // Disallow creating a stream named "extension"
+    if (streamName === "extension") {
+      throw new Error('Stream name "extension" is not allowed');
+    }
+
     const basin = this.client.basin(basinName);
 
     try {
