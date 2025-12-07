@@ -1,0 +1,50 @@
+# Simple HTTP → transform → CloudEvent-to-S2, while replying with transformed JSON
+
+input:
+  http_server:
+    # If you omit address, the service-wide HTTP server is used.
+    # address: ":4195"
+    path: /transform
+    allowed_verbs: [ POST ]
+    sync_response:
+      # Make the HTTP response JSON
+      headers:
+        Content-Type: application/json
+      # You can also interpolate status/headers if needed, see docs.
+
+pipeline:
+  processors:
+    # 1) Slightly transform the incoming JSON object.
+    #    For example, echo it and add an extra field.
+    - mapping: |
+        root = this
+        root.transformed = true
+        root.processed_at = now()  # RFC3339 timestamp string
+
+    # 2) Capture this transformed object as the synchronous HTTP response.
+    - sync_response: {}
+
+    # 3) Now wrap the (already-transformed) object as a CloudEvent.
+    #    This follows the CloudEvents JSON envelope: id, specversion, type, source, time, data. :contentReference[oaicite:4]{index=4}
+    - mapping: |
+        let transformed = this
+
+        root = {
+          "id": uuid_v4(),          # Bloblang uuid function :contentReference[oaicite:5]{index=5}
+          "specversion": "1.0",
+          "type": "com.example.object.transformed",
+          "source": "example/transform-service",
+          "time": now(),            # RFC3339 timestamp
+          "datacontenttype": "application/json",
+          "subject": "object.transformed",
+          "data": $transformed
+        }
+
+output:
+  # Send CloudEvents into an S2 stream
+  s2:
+    basin: ${S2_BASIN}          # e.g. exported as shown in the S2+Bento guide :contentReference[oaicite:6]{index=6}
+    stream: scratch-demo
+    auth_token: "${S2_ACCESS_TOKEN}"   # as per S2 output docs :contentReference[oaicite:7]{index=7}
+    # optional: batching / max_in_flight settings use the documented defaults
+
