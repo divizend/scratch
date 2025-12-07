@@ -176,12 +176,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
             additionalProperties: true,
           },
           default: JSON.stringify({
-            users: [
-              { name: "Alice", email: "alice@example.com", role: "admin" },
-              { name: "Bob", email: "bob@example.com", role: "user" },
-              { name: "Charlie", email: "charlie@example.com", role: "user" },
-            ],
-            metadata: { total: 3, lastUpdated: "2024-01-15" },
+            users: [{ email: "alice@example.com" }],
           }),
           description: "JSON object to extract from",
         },
