@@ -4,17 +4,52 @@ import { S2 } from "../../s2";
 
 // Streamstore endpoints
 export const streamstoreEndpoints: ScratchEndpointDefinition[] = [
+  // Create stream
+  {
+    block: async (context) => ({
+      opcode: "createStream",
+      blockType: "command",
+      text: "create stream [streamName]",
+      schema: {
+        streamName: {
+          type: "string",
+          default: "scratch-demo",
+          description: "Name of the stream to create",
+        },
+      },
+    }),
+    handler: async (context) => {
+      const { streamName } = context.validatedBody!;
+      const basinName = S2.getBasin();
+      const result = await context.universe!.s2!.createStream(
+        basinName,
+        streamName
+      );
+      return {
+        success: true,
+        created: result.created,
+        message: result.message,
+      };
+    },
+    requiredModules: [UniverseModule.S2],
+  },
+
   // Append data to stream
   {
     block: async (context) => ({
       opcode: "appendToStream",
       blockType: "command",
-      text: "append to stream [streamName] data [data]",
+      text: "append to stream [streamName] event type [eventType] data [data]",
       schema: {
         streamName: {
           type: "string",
           default: "scratch-demo",
           description: "Name of the stream",
+        },
+        eventType: {
+          type: "string",
+          default: "com.s2.streamstore.message",
+          description: "CloudEvent type (e.g., com.example.event)",
         },
         data: {
           type: "json",
@@ -37,9 +72,14 @@ export const streamstoreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { streamName, data } = context.validatedBody!;
+      const { streamName, eventType, data } = context.validatedBody!;
       const basinName = S2.getBasin();
-      await context.universe!.s2!.appendToStream(basinName, streamName, data);
+      await context.universe!.s2!.appendToStream(
+        basinName,
+        streamName,
+        data,
+        eventType
+      );
       return {
         success: true,
         message: `Data appended to stream ${streamName} in basin ${basinName}`,
@@ -114,22 +154,17 @@ export const streamstoreEndpoints: ScratchEndpointDefinition[] = [
     requiredModules: [UniverseModule.S2],
   },
 
-  // Read with session
+  // Read from stream (raw CloudEvents)
   {
     block: async (context) => ({
-      opcode: "readStreamSession",
+      opcode: "readFromStreamRaw",
       blockType: "reporter",
-      text: "read from stream [streamName] with session [sessionId] limit [limit]",
+      text: "read raw from stream [streamName] limit [limit]",
       schema: {
         streamName: {
           type: "string",
           default: "scratch-demo",
           description: "Name of the stream",
-        },
-        sessionId: {
-          type: "string",
-          default: "",
-          description: "Session ID for reading (empty for new session)",
         },
         limit: {
           type: "string",
@@ -139,76 +174,48 @@ export const streamstoreEndpoints: ScratchEndpointDefinition[] = [
       },
     }),
     handler: async (context) => {
-      const { streamName, sessionId, limit } = context.validatedBody!;
+      const { streamName, limit } = context.validatedBody!;
       const basinName = S2.getBasin();
       const limitNum = parseInt(limit || "10", 10) || 10;
-      const result = await context.universe!.s2!.readStreamSession(
+      const result = await context.universe!.s2!.readFromStreamRaw(
         basinName,
         streamName,
-        sessionId || "",
         limitNum
       );
-      return {
-        records: result.records,
-        sessionId: result.session,
-      };
+      return result.records;
     },
     requiredModules: [UniverseModule.S2],
   },
 
-  // Append with session
+  // Check tail (get latest records, raw CloudEvents)
   {
     block: async (context) => ({
-      opcode: "appendStreamSession",
-      blockType: "command",
-      text: "append to stream [streamName] with session [sessionId] data [data]",
+      opcode: "checkStreamTailRaw",
+      blockType: "reporter",
+      text: "check raw tail of stream [streamName] limit [limit]",
       schema: {
         streamName: {
           type: "string",
           default: "scratch-demo",
           description: "Name of the stream",
         },
-        sessionId: {
+        limit: {
           type: "string",
-          default: "",
-          description: "Session ID for appending (empty for new session)",
-        },
-        data: {
-          type: "json",
-          schema: {
-            type: "object",
-            properties: {},
-            additionalProperties: true,
-          },
-          default: JSON.stringify({
-            event: "session_update",
-            action: "data_logged",
-            timestamp: new Date().toISOString(),
-            session: {
-              type: "interactive",
-              source: "scratch-block-session",
-            },
-          }),
-          description: "Data to append to the stream",
+          default: "5",
+          description: "Maximum number of latest records to retrieve",
         },
       },
     }),
     handler: async (context) => {
-      const { streamName, sessionId, data } = context.validatedBody!;
+      const { streamName, limit } = context.validatedBody!;
       const basinName = S2.getBasin();
-      const result = await context.universe!.s2!.appendStreamSession(
+      const limitNum = parseInt(limit || "5", 10) || 5;
+      const result = await context.universe!.s2!.checkStreamTailRaw(
         basinName,
         streamName,
-        sessionId || "",
-        data
+        limitNum
       );
-      return {
-        success: true,
-        sessionId: result.session,
-        message: `Data appended to stream ${streamName} in basin ${basinName}${
-          result.session ? ` with session ${result.session}` : ""
-        }`,
-      };
+      return result.records;
     },
     requiredModules: [UniverseModule.S2],
   },

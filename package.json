@@ -8,6 +8,7 @@
   "type": "module",
   "dependencies": {
     "@s2-dev/streamstore": "^0.18.1",
+    "cloudevents": "^10.0.0",
     "google-auth-library": "^10.5.0",
     "googleapis": "^167.0.0",
     "hono": "^4.10.7",
