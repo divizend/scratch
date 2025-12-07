@@ -1,17 +1,7 @@
 /**
  * Universe - Central System Orchestrator
  *
- * The Universe class serves as the central hub for the AI Executive system,
- * coordinating all major components and providing a unified interface for
- * accessing system functionality.
- *
- * The Universe manages:
- * - GSuite integration for Gmail and Google Workspace services
- * - Divizend business logic and workflow automation
- * - Fragment resolution and serving across different content types
- *
- * This class implements the Facade pattern, providing a simplified interface
- * to the complex subsystems while maintaining loose coupling between components.
+ * Please put ALL other APIs in here.
  *
  * @class Universe
  * @version 1.0.0
