@@ -334,10 +334,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
         })
       );
 
-      return {
-        endpoints: resolvedEndpoints,
-        total: resolvedEndpoints.length,
-      };
+      return resolvedEndpoints;
     },
     noAuth: true,
   },
