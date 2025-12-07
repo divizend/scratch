@@ -134,7 +134,12 @@ export function renderStreamViewer(streamName: string): string {
           headers: headers
         });
         if (!response.ok) {
-          document.getElementById('status').textContent = \`Error: \${response.status}\`;
+          if (response.status === 404) {
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('records').innerHTML = '<div class="empty">Stream not found</div>';
+          } else {
+            document.getElementById('status').textContent = \`Error: \${response.status}\`;
+          }
           return;
         }
         const allRecords = await response.json();
