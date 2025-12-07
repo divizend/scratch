@@ -55,14 +55,24 @@ app.use("*", async (c, next) => {
 // Register static routes (README, admin interface)
 registerStaticRoutes(app, projectRoot);
 
-// Register stream viewer routes (e.g., /scratch-demo)
-app.get("/:streamName", async (c) => {
-  const streamName = c.req.param("streamName");
+// Register stream viewer routes (e.g., /scratch-demo or /interpreter/inbox)
+// Use catch-all route to handle multi-segment stream names
+app.get("*", async (c, next) => {
+  const path = c.req.path;
 
-  // Skip if it's a reserved route
-  if (["admin", "api", "extension"].includes(streamName)) {
-    return c.notFound();
+  // Skip reserved routes - let them be handled by other handlers
+  if (
+    path.startsWith("/admin") ||
+    path.startsWith("/api") ||
+    path.startsWith("/extension") ||
+    path === "/"
+  ) {
+    return next();
   }
+
+  // Extract stream name from path (remove leading slash)
+  // This handles both single-segment (e.g., "scratch-demo") and multi-segment (e.g., "interpreter/inbox") stream names
+  const streamName = path.substring(1);
 
   // Serve the stream viewer HTML page
   return c.html(renderStreamViewer(streamName));
