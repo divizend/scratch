@@ -157,7 +157,32 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     handler: async (context) => {
       const { template, data } = context.validatedBody!;
       // data is already parsed and validated by the middleware
-      const rendered = Mustache.render(template, data);
+
+      // Recursively convert "TRUE" to true and "FALSE" to false
+      const normalizeBooleans = (obj: any): any => {
+        if (obj === null || obj === undefined) {
+          return obj;
+        }
+        if (typeof obj === "string") {
+          if (obj === "TRUE") return true;
+          if (obj === "FALSE") return false;
+          return obj;
+        }
+        if (Array.isArray(obj)) {
+          return obj.map(normalizeBooleans);
+        }
+        if (typeof obj === "object") {
+          const normalized: any = {};
+          for (const [key, value] of Object.entries(obj)) {
+            normalized[key] = normalizeBooleans(value);
+          }
+          return normalized;
+        }
+        return obj;
+      };
+
+      const normalizedData = normalizeBooleans(data);
+      const rendered = Mustache.render(template, normalizedData);
       return rendered;
     },
   },
@@ -257,15 +282,24 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
       schema: {
         markdown: {
           type: "string",
-          default:
-            "# Hello World\n\nThis is a **markdown** example with a [link](https://example.com).",
-          description: "Markdown text to convert to HTML",
+          default: JSON.stringify(
+            "# Hello World\n\nThis is a **markdown** example with a [link](https://example.com)."
+          ),
+          description: "JSON-stringified Markdown text to convert to HTML",
         },
       },
     }),
     handler: async (context) => {
       const { markdown } = context.validatedBody!;
-      const html = await marked(markdown);
+      // Parse JSON-stringified markdown first
+      let markdownText: string;
+      try {
+        markdownText = JSON.parse(markdown);
+      } catch (error) {
+        // If parsing fails, assume it's already plain markdown (backward compatibility)
+        markdownText = markdown;
+      }
+      const html = await marked(markdownText);
       return html;
     },
   },
