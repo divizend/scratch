@@ -110,44 +110,15 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
     },
   },
 
-  // Health check for googleapis connection
+  // Health check for all services
   {
     block: async (context) => ({
       opcode: "getHealth",
       blockType: "reporter",
-      text: "Google Workspace connection status",
+      text: "system health status",
     }),
     handler: async (context) => {
-      try {
-        const orgConfigs = (context.universe!.gsuite as any).orgConfigs;
-        if (!orgConfigs || Object.keys(orgConfigs).length === 0) {
-          return {
-            status: "error",
-            message: "No GSuite organizations configured",
-            connected: false,
-          };
-        }
-
-        const firstOrg = Object.keys(orgConfigs)[0];
-        const orgConfig = orgConfigs[firstOrg];
-        const gsuiteUser = context.universe!.gsuite.user(orgConfig.adminUser);
-        const admin = gsuiteUser.admin();
-
-        await admin.getDomains();
-
-        return {
-          status: "ok",
-          message: "Google APIs connection active",
-          connected: true,
-          organization: firstOrg,
-        };
-      } catch (error) {
-        return {
-          status: "error",
-          message: error instanceof Error ? error.message : "Unknown error",
-          connected: false,
-        };
-      }
+      return await context.universe!.getHealth();
     },
     requiredModules: [UniverseModule.GSuite],
   },

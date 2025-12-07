@@ -1,7 +1,8 @@
 import { jwtVerify, SignJWT } from "jose";
+import { env } from "../core/Env";
 
 // JWT secret from environment
-const JWT_SECRET = process.env.WEB_UI_JWT_SECRET || "";
+const JWT_SECRET = env("WEB_UI_JWT_SECRET", { required: false, defaultValue: "" });
 const JWT_SECRET_KEY = JWT_SECRET ? new TextEncoder().encode(JWT_SECRET) : null;
 
 // Helper to validate JWT token and extract payload

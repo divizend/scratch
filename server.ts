@@ -10,6 +10,7 @@ import {
   registerStaticRoutes,
   getRegisteredEndpoints,
 } from "./src/server";
+import { envOrDefault } from "./src/core/Env";
 
 // Get the directory where this file is located
 const __filename = fileURLToPath(import.meta.url);
@@ -82,7 +83,7 @@ registerStaticRoutes(app, projectRoot);
   console.log(`Total: ${endpoints.length} endpoints\n`);
 })();
 
-const port = process.env.PORT || 3000;
+const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
 console.log(`🚀 Server running on http://localhost:${port}`);
 
 export default {

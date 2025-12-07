@@ -18,4 +18,5 @@
 export * from "./core";
 export * from "./gsuite";
 export * from "./resend";
+export * from "./s2";
 export * from "./queue";

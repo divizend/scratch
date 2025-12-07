@@ -187,12 +187,34 @@ async function loadHealthCheck() {
     const statusEl = document.getElementById("healthStatus");
     const healthCheckEl = document.getElementById("healthCheck");
 
-    if (data.connected) {
-      statusEl.textContent = `✓ Connected (${data.organization || "active"})`;
+    // Parse the health response structure
+    const overallStatus = data.status || "unknown";
+    const services = data.services || {};
+
+    // Build status message from all services
+    const serviceStatuses = Object.entries(services).map(([name, service]) => {
+      const statusIcon = service.connected ? "✓" : "✗";
+      const serviceName = name.charAt(0).toUpperCase() + name.slice(1);
+      return `${statusIcon} ${serviceName}: ${
+        service.message || service.status
+      }`;
+    });
+
+    const statusText =
+      serviceStatuses.length > 0
+        ? serviceStatuses.join(" | ")
+        : `Overall: ${overallStatus}`;
+
+    statusEl.textContent = statusText;
+
+    // Set colors based on overall status
+    if (overallStatus === "ok") {
       statusEl.style.color = "#155724";
       healthCheckEl.style.background = "#d4edda";
+    } else if (overallStatus === "warning") {
+      statusEl.style.color = "#856404";
+      healthCheckEl.style.background = "#fff3cd";
     } else {
-      statusEl.textContent = `✗ ${data.message || "Disconnected"}`;
       statusEl.style.color = "#721c24";
       healthCheckEl.style.background = "#f8d7da";
     }

@@ -21,6 +21,7 @@
 import { JWT } from "google-auth-library";
 import { admin_directory_v1 } from "googleapis";
 import { GSuiteOrgConfig, GSuiteUser, Universe } from "../..";
+import { parseEnvGroup } from "../../core/Env";
 
 export class GSuite {
   /**
@@ -57,42 +58,31 @@ export class GSuite {
    * @throws Error if required credentials are missing or invalid
    */
   static async construct(universe: Universe) {
-    // Group environment variables by organization identifier
-    let gcpCreds: {
-      [key: string]: {
-        clientEmail?: string;
-        privateKey?: string;
-        adminUser?: string;
-      };
-    } = {};
-
-    // Parse environment variables for each organization
-    for (const key of Object.keys(process.env)) {
-      if (
-        key.startsWith("GCP_CLIENT_EMAIL_") ||
-        key.startsWith("GCP_PRIVATE_KEY_") ||
-        key.startsWith("GCP_ADMIN_USER_")
-      ) {
-        const identifier = key.split("_", 4)[3]!.toLowerCase();
-        if (!gcpCreds[identifier]) {
-          gcpCreds[identifier] = {};
-        }
-        gcpCreds[identifier][
-          key.startsWith("GCP_CLIENT_EMAIL_")
-            ? "clientEmail"
-            : key.startsWith("GCP_PRIVATE_KEY_")
-            ? "privateKey"
-            : "adminUser"
-        ] = process.env[key]!;
+    // Parse environment variables grouped by organization identifier
+    const gcpCreds = parseEnvGroup<
+      {
+        clientEmail: string;
+        privateKey: string;
+        adminUser: string;
       }
-    }
-
-    // Validate that credentials are provided
-    if (Object.keys(gcpCreds).length === 0) {
-      throw new Error(
-        "No GCP credentials found. Please set GCP_CLIENT_EMAIL_<identifier>, GCP_PRIVATE_KEY_<identifier> and GCP_ADMIN_USER_<identifier> environment variables."
-      );
-    }
+    >(
+      ["GCP_CLIENT_EMAIL_", "GCP_PRIVATE_KEY_", "GCP_ADMIN_USER_"],
+      {
+        propertyMap: {
+          "GCP_CLIENT_EMAIL_": "clientEmail",
+          "GCP_PRIVATE_KEY_": "privateKey",
+          "GCP_ADMIN_USER_": "adminUser",
+        },
+        identifierExtractor: (key: string) => {
+          // For "GCP_CLIENT_EMAIL_ORG1", split by "_" gives ["GCP", "CLIENT", "EMAIL", "ORG1"]
+          // We want the 4th segment (index 3), lowercased
+          const parts = key.split("_");
+          return parts[3]?.toLowerCase() || "";
+        },
+        errorMessage:
+          "No GCP credentials found. Please set GCP_CLIENT_EMAIL_<identifier>, GCP_PRIVATE_KEY_<identifier> and GCP_ADMIN_USER_<identifier> environment variables.",
+      }
+    );
 
     const orgConfigs: {
       [org: string]: GSuiteOrgConfig;
@@ -201,5 +191,47 @@ export class GSuite {
       orgConfig.getAuth(email),
       directoryData
     );
+  }
+
+  /**
+   * Checks the health of the GSuite service
+   * Verifies connectivity by attempting to fetch domains from the first organization
+   *
+   * @returns Promise<{ status: string; message: string; connected: boolean; organization?: string }>
+   */
+  async getHealth(): Promise<{
+    status: string;
+    message: string;
+    connected: boolean;
+    organization?: string;
+  }> {
+    try {
+      if (!this.orgConfigs || Object.keys(this.orgConfigs).length === 0) {
+        return {
+          status: "error",
+          message: "No GSuite organizations configured",
+          connected: false,
+        };
+      }
+
+      const firstOrg = Object.keys(this.orgConfigs)[0];
+      const orgConfig = this.orgConfigs[firstOrg];
+      const gsuiteUser = this.user(orgConfig.adminUser);
+      const admin = gsuiteUser.admin();
+      await admin.getDomains();
+
+      return {
+        status: "ok",
+        message: "Google APIs connection active",
+        connected: true,
+        organization: firstOrg,
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        connected: false,
+      };
+    }
   }
 }

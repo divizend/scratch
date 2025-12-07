@@ -8,6 +8,8 @@
  * @version 1.0.0
  */
 
+import { envOr, envOrDefault } from "../core/Env";
+
 export interface ResendEmailParams {
   from: string;
   to: string;
@@ -57,13 +59,12 @@ export class Resend {
    * @throws Error if API key is not provided and RESEND_API_KEY is not set
    */
   static async construct(apiKey?: string, apiRoot?: string): Promise<Resend> {
-    const key = apiKey || process.env.RESEND_API_KEY || "";
-    if (!key) {
-      throw new Error(
-        "Resend API key is required. Provide it via parameter or RESEND_API_KEY environment variable."
-      );
-    }
-    const root = apiRoot || process.env.RESEND_API_ROOT || "api.resend.com";
+    const key = envOr(
+      apiKey,
+      "RESEND_API_KEY",
+      "Resend API key is required. Provide it via parameter or RESEND_API_KEY environment variable."
+    );
+    const root = envOrDefault(apiRoot, "RESEND_API_ROOT", "api.resend.com");
 
     // Fetch domains once during construction
     let domains: string[] = [];
@@ -156,5 +157,34 @@ export class Resend {
       status: response.status,
       text,
     };
+  }
+
+  /**
+   * Checks the health of the Resend service
+   * Verifies connectivity by checking cached domains
+   *
+   * @returns { status: string; message: string; connected: boolean; domains?: number }
+   */
+  getHealth(): {
+    status: string;
+    message: string;
+    connected: boolean;
+    domains?: number;
+  } {
+    try {
+      const domains = this.getDomains();
+      return {
+        status: "ok",
+        message: "Resend connected",
+        connected: true,
+        domains: domains.length,
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        connected: false,
+      };
+    }
   }
 }

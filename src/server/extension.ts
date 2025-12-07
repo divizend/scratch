@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { validateJwtToken } from "./auth";
 import { scratchEndpoints, ScratchContext, ScratchBlock } from "./scratch";
+import { envOrDefault } from "../core/Env";
 
 // Helper function to convert email to hyphenated name (e.g., "julian.nalenz@divizend.com" -> "julian-nalenz")
 function emailToHyphenatedName(email: string): string {
@@ -26,7 +27,7 @@ function toTitleCase(str: string): string {
 
 // Generate extension ID and name from hyphenated name
 function generateExtensionInfo(name: string) {
-  const orgName = process.env.ORG_NAME || "divizend";
+  const orgName = envOrDefault(undefined, "ORG_NAME", "divizend");
   const orgNamePascal = orgName.charAt(0).toUpperCase() + orgName.slice(1);
   const namePascal = hyphenatedToPascalCase(name);
   const nameTitle = toTitleCase(name);
@@ -40,7 +41,7 @@ function generateExtensionInfo(name: string) {
 // Determine the base URL for the extension based on whether we're running locally
 function getBaseUrl(c: any): string {
   const host = c.req.header("host") || "";
-  const port = process.env.PORT || 3000;
+  const port = envOrDefault(undefined, "PORT", "3000");
   const isLocal =
     host.includes("localhost") ||
     host.includes("127.0.0.1") ||
@@ -53,7 +54,7 @@ function getBaseUrl(c: any): string {
     return `http://localhost:${port}`;
   }
 
-  const HOSTED_AT = process.env.HOSTED_AT || "scratch.divizend.ai";
+  const HOSTED_AT = envOrDefault(undefined, "HOSTED_AT", "scratch.divizend.ai");
   // Use HOSTED_AT, ensuring it has a protocol
   const hostedAt = HOSTED_AT.startsWith("http")
     ? HOSTED_AT

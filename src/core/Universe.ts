@@ -30,6 +30,7 @@ import {
   QueuedEmail,
   Resend,
   JsonSchemaValidator,
+  S2,
 } from "..";
 
 /**
@@ -42,6 +43,8 @@ export enum UniverseModule {
   Resend = "resend",
   /** Email queue for managing and sending emails */
   EmailQueue = "emailQueue",
+  /** S2 streamstore for durable stream storage */
+  S2 = "s2",
 }
 
 export class Universe {
@@ -51,6 +54,8 @@ export class Universe {
   public emailQueue!: EmailQueue;
   /** Resend email service integration */
   public resend?: Resend;
+  /** S2 streamstore for durable stream storage */
+  public s2!: S2;
   /** JSON Schema validator for request validation */
   public jsonSchemaValidator: JsonSchemaValidator = new JsonSchemaValidator();
 
@@ -86,6 +91,17 @@ export class Universe {
       console.warn(
         "Resend not initialized:",
         error instanceof Error ? error.message : String(error)
+      );
+    }
+
+    // Initialize S2 streamstore (required)
+    try {
+      universe.s2 = S2.construct();
+    } catch (error) {
+      throw new Error(
+        `S2 streamstore is required but failed to initialize: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
 
@@ -193,6 +209,8 @@ export class Universe {
         return !!this.resend;
       case UniverseModule.EmailQueue:
         return !!this.emailQueue;
+      case UniverseModule.S2:
+        return !!this.s2;
       default:
         return false;
     }
@@ -221,5 +239,59 @@ export class Universe {
         throw new Error(`Unknown URI type: ${parsedUri.type}`);
       }
     }
+  }
+
+  /**
+   * Checks the health of all services in the Universe
+   * Aggregates health status from all configured services
+   *
+   * @returns Promise<{ status: string; services: { [key: string]: any } }>
+   */
+  async getHealth(): Promise<{
+    status: string;
+    services: { [key: string]: any };
+  }> {
+    const health: any = {
+      status: "ok",
+      services: {},
+    };
+
+    // Check GSuite
+    if (this.gsuite) {
+      health.services.gsuite = await this.gsuite.getHealth();
+    }
+
+    // Check Resend
+    if (this.resend) {
+      health.services.resend = this.resend.getHealth();
+    } else {
+      health.services.resend = {
+        status: "warning",
+        message: "RESEND_API_KEY not configured",
+        connected: false,
+      };
+    }
+
+    // Check S2
+    if (this.s2) {
+      health.services.s2 = await this.s2.getHealth();
+    }
+
+    // Determine overall status
+    const hasErrors = Object.values(health.services).some(
+      (service: any) => service.status === "error"
+    );
+    if (hasErrors) {
+      health.status = "error";
+    } else {
+      const hasWarnings = Object.values(health.services).some(
+        (service: any) => service.status === "warning"
+      );
+      if (hasWarnings) {
+        health.status = "warning";
+      }
+    }
+
+    return health;
   }
 }
