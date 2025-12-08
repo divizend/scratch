@@ -1,6 +1,6 @@
 # Scratch for Business Process Automation
 
-[![Star on GitHub](https://img.shields.io/github/stars/divizend/scratch?style=social)](https://github.com/divizend/scratch) [![Build Status](https://github.com/divizend/scratch/actions/workflows/ci.yml/badge.svg)](https://github.com/divizend/scratch/actions)
+[![Star on GitHub](https://img.shields.io/github/stars/divizend/scratch?style=social)](https://github.com/divizend/scratch)
 
 ## Short links
 
