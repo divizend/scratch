@@ -48,7 +48,7 @@ Therefore, please save your projects and reload the Scratch editor page from tim
 4. Run `bun run dev`
 5. Visit http://localhost:3000 and click on "Admin interface", send a token to your email address and enter it.
 6. Click on "Open Scratch" to launch Scratch with an extension which contains the configured endpoints (see `src/server/endpoints.ts`).
-7. Choose the "queue email" block from the e.g. "Divizend (Julian Nalenz)" section, try it and see how the queued email shows up in the admin interface.
+7. Choose the "queue email" block from the e.g. "Divizend" section (named based on your ORG_NAME environment variable), try it and see how the blocks interact. Note that you can also click on any block to execute it.
 
 ## Setting up GSuite
 
