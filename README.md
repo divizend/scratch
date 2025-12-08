@@ -6,6 +6,18 @@
 
 ## Introduction
 
+Scratch is the visual programming language with which I also learnt programming when I was around 10. When you go to https://scratch.divizend.ai/admin (or click on "Admin interface"), first send an access token to your email. It'll look like this:
+
+![]
+
+Of course the actual point of this all is not Scratch itself, but to harmonize the systems we're interacting with within our organization through their APIs. Therefore the background of the Scratch layer on the surface is this repo (every block is actually just an API call). It should initiate the harmonization of all the APIs of the systems that constitute any organization in a language "as simple as child's play", i.e. Scratch blocks. My next experiment will be to transfer all business logic into communication on streams, to embrace the event-driven paradigm more and increase reliability and efficiency of the system, so let me know in case you'd like to participate in the more technical details here, by sending 
+
+This means that the goal is a conscious simplification, always with an API-first focus on the inside. Scratch should always be a "playground" for all your automation needs, but any blocks can be added in "regular" code quickly, and therefore be rolled out to everyone in the company. Adding blocks simply happens here in the GitHub repo, and should, over time, become a frequent process until all our operations are cleanly covered. So in case you see yourself frequently reuse functionality, please let me know.
+
+Therefore, please save your projects and reload the Scratch editor page from time to time, to always be up to date with the newest features. The URL passed to the Scratch editor UI stays the same across any updates. So with that said: Build!
+
+## Usage
+
 The code from this website can be run by visiting the [admin interface](/admin) and clicking on "Open in Scratch".
 
 The web server defined in this repository ([github.com/divizend/scratch](https://github.com/divizend/scratch)) is currently deployed at [scratch.divizend.ai](https://scratch.divizend.ai).
