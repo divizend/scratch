@@ -42,7 +42,7 @@
     }
 
     try {
-      const response = await fetch("/api/createStream", {
+      const response = await fetch("/createStream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,7 +89,7 @@
       }
 
       const response = await fetch(
-        `/api/checkStreamTailRaw?streamName=${encodeURIComponent(
+        `/checkStreamTailRaw?streamName=${encodeURIComponent(
           streamName
         )}&limit=50`,
         {

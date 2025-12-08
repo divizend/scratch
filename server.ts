@@ -6,11 +6,9 @@ import { Universe } from "./src";
 import {
   registerEndpoints,
   setUniverse,
-  registerExtensionEndpoint,
   registerStaticRoutes,
   getRegisteredEndpoints,
 } from "./src/server";
-import { renderStreamViewer } from "./src/server/streamViewer";
 import { envOrDefault, env } from "./src/core/Env";
 import { getUniverse } from "./src/server/universe";
 import { S2 } from "./src/s2";
@@ -132,39 +130,14 @@ app.use("*", async (c, next) => {
   c.header("Expires", "0");
 });
 
-// Register static routes (README, admin interface)
+// Register static routes (README only - admin and extension are now endpoints)
 registerStaticRoutes(app, projectRoot);
-
-// Register stream viewer routes (e.g., /scratch-demo or /interpreter/inbox)
-// Use catch-all route to handle multi-segment stream names
-app.get("*", async (c, next) => {
-  const path = c.req.path;
-
-  // Skip reserved routes - let them be handled by other handlers
-  if (
-    path.startsWith("/admin") ||
-    path.startsWith("/api") ||
-    path.startsWith("/extension") ||
-    path === "/"
-  ) {
-    return next();
-  }
-
-  // Extract stream name from path (remove leading slash)
-  // This handles both single-segment (e.g., "scratch-demo") and multi-segment (e.g., "interpreter/inbox") stream names
-  const streamName = path.substring(1);
-
-  // Serve the stream viewer HTML page
-  return c.html(renderStreamViewer(streamName));
-});
 
 // Register all Scratch endpoints and log them
 (async () => {
   // Register all Scratch endpoints
   await registerEndpoints(app);
 
-  // Register extension source endpoint
-  registerExtensionEndpoint(app);
 
   // Log all registered endpoints
   const endpoints = getRegisteredEndpoints();

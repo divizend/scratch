@@ -320,7 +320,7 @@ export const coreEndpoints: ScratchEndpointDefinition[] = [
         endpointDefinitions.map(async (epDef) => {
           const blockDef = await epDef.block(context);
           const method = blockDef.blockType === "reporter" ? "GET" : "POST";
-          const endpoint = `/api/${blockDef.opcode}`;
+          const endpoint = `/${blockDef.opcode}`;
 
           return {
             method,

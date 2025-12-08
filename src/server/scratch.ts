@@ -382,8 +382,13 @@ export async function registerScratchEndpoint(
     const { getUniverse } = await import("./universe");
     const universe = getUniverse();
 
-    // Create context
-    const context: ScratchContext = { userEmail, universe };
+    // Create context - include Hono context for access to request/response
+    const context: ScratchContext & { c?: any; query?: any } = { 
+      userEmail, 
+      universe,
+      c, // Pass Hono context for access to request/response
+      query: c.req.query(), // Extract query parameters
+    };
     c.scratchContext = context;
 
     // Get block definition from function (await since it returns a Promise)
@@ -463,6 +468,7 @@ export async function registerScratchEndpoint(
         return result;
       }
       // If handler returns a string, return as plain text
+      // Note: For HTML content, handlers should return a Response with Content-Type: text/html
       if (typeof result === "string") {
         return c.text(result);
       }
@@ -488,7 +494,7 @@ export async function registerScratchEndpoint(
   // Use a default context to get the opcode (await since block returns a Promise)
   const defaultContext: ScratchContext = {};
   const blockDef = await block(defaultContext);
-  const endpoint = `/api/${blockDef.opcode}`;
+  const endpoint = `/${blockDef.opcode}`;
   const method = blockDef.blockType === "reporter" ? "get" : "post";
 
   // Store endpoint info - store the block function so it can be resolved with user context later

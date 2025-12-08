@@ -40,7 +40,7 @@ loadEndpoints();
 
 async function checkDomains() {
   try {
-    const response = await fetch("/api/getDomains");
+    const response = await fetch("/getDomains");
     const domains = await response.json();
 
     if (Array.isArray(domains) && domains.length > 0) {
@@ -71,7 +71,7 @@ async function sendJWT() {
   showStatus("Sending JWT token...", "info", "jwtSendStatus");
 
   try {
-    const response = await fetch("/api/sendJwt", {
+    const response = await fetch("/sendJwt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -114,7 +114,7 @@ async function authenticate() {
 
   // Get user info
   try {
-    const response = await fetch("/api/getUser", {
+    const response = await fetch("/getUser", {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -142,7 +142,7 @@ function openScratch() {
 
   // Construct Scratch URL with the JWT token
   const baseUrl = window.location.origin;
-  const extensionUrl = `${baseUrl}/extension/${token}.js`;
+  const extensionUrl = `${baseUrl}/extension?jwt=${encodeURIComponent(token)}`;
   const scratchUrl = `https://sheeptester.github.io/scratch-gui/?url=${encodeURIComponent(
     extensionUrl
   )}`;
@@ -159,7 +159,7 @@ function openScratchSource() {
 
   // Construct extension source URL with the JWT token
   const baseUrl = window.location.origin;
-  const extensionUrl = `${baseUrl}/extension/${token}.js`;
+  const extensionUrl = `${baseUrl}/extension?jwt=${encodeURIComponent(token)}`;
 
   // Open extension source in new tab
   window.open(extensionUrl, "_blank");
@@ -176,7 +176,7 @@ function logout() {
 
 async function loadHealthCheck() {
   try {
-    const response = await fetch("/api/getHealth", {
+    const response = await fetch("/getHealth", {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -240,7 +240,7 @@ function showStatus(message, type, elementId = "status") {
 
 async function loadEndpoints() {
   try {
-    const response = await fetch("/api/listEndpoints");
+    const response = await fetch("/listEndpoints");
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
