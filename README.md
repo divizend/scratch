@@ -1,6 +1,6 @@
 # Scratch for Business Process Automation
 
-[![Star on GitHub](https://img.shields.io/github/stars/divizend/scratch?style=social)](https://github.com/divizend/scratch)
+[![Star on GitHub](https://img.shields.io/github/stars/divizend/scratch?style=social)](https://github.com/divizend/scratch) [![Build Status](https://github.com/divizend/scratch/actions/workflows/ci.yml/badge.svg)](https://github.com/divizend/scratch/actions)
 
 ## Short links
 
@@ -42,13 +42,14 @@ Therefore, please save your projects and reload the Scratch editor page from tim
 
 ## Local setup
 
-1. `cp .env.example .env`
-2. Update the different secrets in your `.env`. Follow the instructions below to set up the integration with Google Workspace.
-3. Run `bun install`
-4. Run `bun run dev`
-5. Visit http://localhost:3000 and click on "Admin interface", send a token to your email address and enter it.
-6. Click on "Open Scratch" to launch Scratch with an extension which contains the configured endpoints (see `src/server/endpoints.ts`).
-7. Choose the "queue email" block from the e.g. "Divizend" section (named based on your ORG_NAME environment variable), try it and see how the blocks interact. Note that you can also click on any block to execute it.
+1. [Install bun.](https://bun.com/docs/installation)
+2. `cp .env.example .env`
+3. Update the different secrets in your `.env`. Follow the instructions below to set up the integration with Google Workspace.
+4. Run `bun install`
+5. Run `bun run dev`
+6. Visit http://localhost:3000 and click on "Admin interface", send a token to your email address and enter it.
+7. Click on "Open Scratch" to launch Scratch with an extension which contains the configured endpoints (see `src/server/endpoints.ts`).
+8. Choose the "queue email" block from the e.g. "Divizend" section (named based on your ORG_NAME environment variable), try it and see how the blocks interact. Note that you can also click on any block to execute it.
 
 ## Setting up GSuite
 
