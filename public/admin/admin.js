@@ -247,7 +247,7 @@ async function loadEndpoints() {
     const data = await response.json();
 
     // Handle both { endpoints: [...] } and [...] formats
-    const endpoints = Array.isArray(data) ? data : (data.endpoints || []);
+    const endpoints = Array.isArray(data) ? data : data.endpoints || [];
     const container = document.getElementById("endpointsContainer");
 
     if (endpoints.length === 0) {
@@ -271,8 +271,7 @@ async function loadEndpoints() {
     `;
 
     endpoints.forEach((endpoint) => {
-      const methodColor =
-        endpoint.method === "GET" ? "#28a745" : "#0366d6";
+      const methodColor = endpoint.method === "GET" ? "#28a745" : "#0366d6";
       const authBadge = endpoint.requiresAuth
         ? '<span style="color: #856404; font-weight: 500;">Required</span>'
         : '<span style="color: #155724;">No</span>';
