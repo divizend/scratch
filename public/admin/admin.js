@@ -35,6 +35,9 @@ if (token) {
   authenticate();
 }
 
+// Load endpoints on page load (works without auth)
+loadEndpoints();
+
 async function checkDomains() {
   try {
     const response = await fetch("/api/getDomains");
@@ -233,4 +236,86 @@ function showStatus(message, type, elementId = "status") {
   setTimeout(() => {
     if (elementId === "status") el.innerHTML = "";
   }, 5000);
+}
+
+async function loadEndpoints() {
+  try {
+    const response = await fetch("/api/listEndpoints");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+
+    // Handle both { endpoints: [...] } and [...] formats
+    const endpoints = Array.isArray(data) ? data : (data.endpoints || []);
+    const container = document.getElementById("endpointsContainer");
+
+    if (endpoints.length === 0) {
+      container.innerHTML = "<p>No endpoints available</p>";
+      return;
+    }
+
+    // Create compact table view
+    let html = `
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+              <th style="padding: 8px; text-align: left; width: 60px;">Method</th>
+              <th style="padding: 8px; text-align: left; min-width: 200px;">Path</th>
+              <th style="padding: 8px; text-align: left;">Description</th>
+              <th style="padding: 8px; text-align: center; width: 80px;">Auth</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    endpoints.forEach((endpoint) => {
+      const methodColor =
+        endpoint.method === "GET" ? "#28a745" : "#0366d6";
+      const authBadge = endpoint.requiresAuth
+        ? '<span style="color: #856404; font-weight: 500;">Required</span>'
+        : '<span style="color: #155724;">No</span>';
+
+      html += `
+        <tr style="border-bottom: 1px solid #eee;">
+          <td style="padding: 6px 8px;">
+            <span style="
+              display: inline-block;
+              padding: 2px 6px;
+              background: ${methodColor};
+              color: white;
+              border-radius: 3px;
+              font-size: 11px;
+              font-weight: 600;
+            ">${endpoint.method}</span>
+          </td>
+          <td style="padding: 6px 8px; font-family: monospace; font-size: 12px;">
+            ${endpoint.path}
+          </td>
+          <td style="padding: 6px 8px; color: #666;">
+            ${endpoint.text || endpoint.opcode || "-"}
+          </td>
+          <td style="padding: 6px 8px; text-align: center;">
+            ${authBadge}
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top: 10px; font-size: 12px; color: #666;">
+        Total: ${endpoints.length} endpoint${endpoints.length !== 1 ? "s" : ""}
+      </p>
+    `;
+
+    container.innerHTML = html;
+  } catch (error) {
+    document.getElementById("endpointsContainer").innerHTML = `
+      <p style="color: #721c24;">Error loading endpoints: ${error.message}</p>
+    `;
+  }
 }
