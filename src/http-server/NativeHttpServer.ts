@@ -535,12 +535,20 @@ export class NativeHttpServer implements HttpServer {
 
   // Endpoint management methods
   async loadEndpointsFromDirectory(directoryPath: string): Promise<void> {
+    const hostType = envOrDefault(undefined, "HOST_TYPE", "local");
+    const githubUrl = process.env.ENDPOINTS_GITHUB_URL;
+
+    if (hostType === "production" && githubUrl) {
+      log({ level: "info", event: "loading_endpoints_from_github", githubUrl });
+      await this.loadEndpointsFromGitHub(githubUrl);
+      return;
+    }
+
     if (!isAbsolute(directoryPath)) {
       throw new Error(`Expected absolute path, got: ${directoryPath}`);
     }
 
     log({ level: "info", event: "loading_endpoints", directoryPath });
-
     const filePaths = await this.iterateEndpointFiles(directoryPath);
     log({
       level: "info",
@@ -550,7 +558,6 @@ export class NativeHttpServer implements HttpServer {
     });
 
     const loadedEndpoints: ScratchEndpointDefinition[] = [];
-
     for (const filePath of filePaths) {
       try {
         const source = await readFile(filePath, "utf-8");
@@ -579,7 +586,6 @@ export class NativeHttpServer implements HttpServer {
       }
     }
 
-    // PUT: Add all loaded endpoints to KV store
     await this.registerEndpoints(loadedEndpoints);
 
     log({
@@ -590,6 +596,111 @@ export class NativeHttpServer implements HttpServer {
 
     // Mark as initialized
     this.isInitialized = true;
+  }
+
+  private async loadEndpointsFromGitHub(githubUrl: string): Promise<void> {
+    // Parse GitHub URL: https://github.com/owner/repo/tree/branch/path
+    // Example: https://github.com/divizend/scratch/tree/main/endpoints
+    const urlMatch = githubUrl.match(
+      /https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/tree\/([^\/]+)\/(.+)$/
+    );
+    if (!urlMatch) {
+      throw new Error(
+        `Invalid GitHub URL format. Expected: https://github.com/owner/repo/tree/branch/path, got: ${githubUrl}`
+      );
+    }
+
+    const [, owner, repo, branch, path] = urlMatch;
+
+    // Fetch file list from GitHub API
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+    log({ level: "info", event: "fetching_github_file_list", apiUrl });
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "scratch-server",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch GitHub file list: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const files = (await response.json()) as Array<{
+      name: string;
+      type: string;
+      download_url?: string;
+    }>;
+
+    // Filter for .ts files
+    const tsFiles = files.filter(
+      (f) => f.type === "file" && f.name.endsWith(".ts")
+    );
+
+    log({
+      level: "info",
+      event: "github_files_found",
+      count: tsFiles.length,
+      files: tsFiles.map((f) => f.name),
+    });
+
+    const loadedEndpoints: ScratchEndpointDefinition[] = [];
+
+    // Fetch and parse each file
+    for (const file of tsFiles) {
+      try {
+        // Use raw.githubusercontent.com for file content
+        const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}/${file.name}`;
+        log({
+          level: "info",
+          event: "fetching_github_file",
+          file: file.name,
+          url: rawUrl,
+        });
+
+        const fileResponse = await fetch(rawUrl, {
+          headers: {
+            "User-Agent": "scratch-server",
+          },
+        });
+
+        if (!fileResponse.ok) {
+          throw new Error(
+            `Failed to fetch file ${file.name}: ${fileResponse.status} ${fileResponse.statusText}`
+          );
+        }
+
+        const source = await fileResponse.text();
+        const endpoint = await this.parseEndpointFromSource(source, file.name);
+        if (endpoint) {
+          const blockDef = await endpoint.block({});
+          if (!blockDef.opcode || blockDef.opcode === "") {
+            throw new Error(`Endpoint from ${file.name} has empty opcode`);
+          }
+          this.endpoints.set(blockDef.opcode, endpoint);
+          loadedEndpoints.push(endpoint);
+          log({
+            level: "info",
+            event: "endpoint_loaded",
+            opcode: blockDef.opcode,
+            file: file.name,
+          });
+        }
+      } catch (error) {
+        log({
+          level: "error",
+          event: "endpoint_load_failed",
+          file: file.name,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // PUT: Add all loaded endpoints to KV store
+    await this.registerEndpoints(loadedEndpoints);
   }
 
   getAllEndpoints(): ScratchEndpointDefinition[] {
@@ -654,12 +765,34 @@ export class NativeHttpServer implements HttpServer {
 
   private async iterateEndpointFiles(directoryPath: string): Promise<string[]> {
     try {
+      const { stat } = await import("node:fs/promises");
+      const dirStats = await stat(directoryPath);
+      if (!dirStats.isDirectory()) {
+        log({
+          level: "error",
+          event: "endpoints_path_not_directory",
+          directoryPath,
+        });
+        return [];
+      }
       const files = await readdir(directoryPath);
+      log({
+        level: "info",
+        event: "directory_read",
+        directoryPath,
+        total_files: files.length,
+        all_files: files,
+      });
       // Include all .ts files - files that don't export endpoints will be filtered out during parsing
       const tsFiles = files.filter((f) => f.endsWith(".ts"));
       return tsFiles.map((f) => join(directoryPath, f));
     } catch (error) {
-      console.error(`Failed to read directory ${directoryPath}:`, error);
+      log({
+        level: "error",
+        event: "directory_read_failed",
+        directoryPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return [];
     }
   }

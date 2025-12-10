@@ -20,12 +20,11 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
     return fetchHandler;
   }
 
-  // Get endpoints directory - in Vercel, the working directory is /var/task
-  // The endpoints directory should be at the project root
   const projectRoot = cwd();
   const endpointsDir = resolve(join(projectRoot, "endpoints"));
+  const { envOrDefault } = await import("../src/core/Env");
+  const hostType = envOrDefault(undefined, "HOST_TYPE", "local");
 
-  // Minimal logger for initialization
   const initLog = (record: Record<string, unknown>) => {
     if (!record.ts) record.ts = new Date().toISOString();
     console.log(JSON.stringify(record));
@@ -36,9 +35,13 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
     event: "initializing_universe",
     projectRoot,
     endpointsDir,
+    hostType,
+    githubUrl:
+      hostType === "production" ? process.env.ENDPOINTS_GITHUB_URL : undefined,
   });
 
   // Initialize Universe (this won't start an HTTP server in Vercel/Bun environment)
+  // Pass endpointsDir even on server - loadEndpointsFromDirectory will detect server and use GitHub
   universe = await Universe.construct({
     endpointsDirectory: endpointsDir,
   });
