@@ -113,8 +113,14 @@ export class NativeHttpServer implements HttpServer {
     const path = context.path || "";
 
     // Extract opcode from path (remove leading slash, handle empty path)
-    const opcode =
+    // Map root path "/" to "root" endpoint
+    let opcode =
       path === "/" ? "" : path.startsWith("/") ? path.substring(1) : path;
+
+    // If opcode is empty (root path), use "root" endpoint
+    if (opcode === "") {
+      opcode = "root";
+    }
 
     // Look up endpoint directly from KV store (current state, no cache)
     const endpoint = this.endpoints.get(opcode);
