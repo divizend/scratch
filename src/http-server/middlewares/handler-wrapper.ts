@@ -14,6 +14,9 @@ import {
 } from "../../core/index";
 import { IncomingMessage, ServerResponse } from "node:http";
 
+// Type alias for schema property values
+type SchemaProperty = NonNullable<ScratchBlock["schema"]>[string];
+
 export interface HandlerWrapperOptions {
   universe: Universe;
   endpoint: ScratchEndpointDefinition;
@@ -113,13 +116,13 @@ export async function wrapHandlerWithAuthAndValidation(
             Object.keys(schema).map((key) => [key, query[key] || undefined])
           )
         : requestBody || {};
-      
 
       // Handle JSON type properties
       if (schema) {
         for (const [key, propSchema] of Object.entries(schema)) {
+          const typedPropSchema = propSchema as SchemaProperty;
           if (
-            propSchema.type === "json" &&
+            typedPropSchema.type === "json" &&
             data[key] !== undefined &&
             data[key] !== null &&
             data[key] !== ""
@@ -127,13 +130,13 @@ export async function wrapHandlerWithAuthAndValidation(
             try {
               // If data[key] is already an object, use it directly
               let parsed = data[key];
-              if (typeof data[key] === 'string') {
+              if (typeof data[key] === "string") {
                 parsed = JSON.parse(data[key]);
               }
-              if (propSchema.schema) {
+              if (typedPropSchema.schema) {
                 const wrappedSchema: JsonSchema = {
                   type: "object",
-                  properties: { value: propSchema.schema },
+                  properties: { value: typedPropSchema.schema },
                   required: ["value"],
                 };
                 const result = validator.validate(wrappedSchema, {
@@ -167,8 +170,9 @@ export async function wrapHandlerWithAuthAndValidation(
       const dataForValidation: any = { ...data };
       if (schema) {
         for (const [key, propSchema] of Object.entries(schema)) {
+          const typedPropSchema = propSchema as SchemaProperty;
           if (
-            propSchema.type === "json" &&
+            typedPropSchema.type === "json" &&
             dataForValidation[key] !== undefined
           )
             delete dataForValidation[key];
@@ -183,7 +187,8 @@ export async function wrapHandlerWithAuthAndValidation(
       const finalData = { ...result.data };
       if (schema) {
         for (const [key, propSchema] of Object.entries(schema)) {
-          if (propSchema.type === "json" && data[key] !== undefined)
+          const typedPropSchema = propSchema as SchemaProperty;
+          if (typedPropSchema.type === "json" && data[key] !== undefined)
             finalData[key] = data[key];
         }
       }
@@ -210,22 +215,28 @@ function constructJsonSchema(schema?: ScratchBlock["schema"]): JsonSchema {
   const properties: any = {};
   const required: string[] = [];
   for (const [key, propSchema] of Object.entries(schema)) {
-    if (propSchema.type === "json") {
-      if (!propSchema.schema)
+    // Type assertion: schema is defined as Record<string, {...}>, so propSchema is the value type
+    const typedPropSchema = propSchema as SchemaProperty;
+    if (typedPropSchema.type === "json") {
+      if (!typedPropSchema.schema)
         throw new Error(
           `Property ${key} has type "json" but no schema provided`
         );
       properties[key] = {
         type: "string",
-        description: propSchema.description,
-        _jsonSchema: propSchema.schema,
+        description: typedPropSchema.description,
+        _jsonSchema: typedPropSchema.schema,
       };
     } else {
       // Copy schema but exclude non-JSON-Schema fields
-      const { default: _, description: __, ...jsonSchemaProps } = propSchema;
+      const {
+        default: _,
+        description: __,
+        ...jsonSchemaProps
+      } = typedPropSchema;
       properties[key] = jsonSchemaProps;
       // Only add to required if there's no default or default is a placeholder
-      if (!propSchema.default || propSchema.default === `[${key}]`) {
+      if (!typedPropSchema.default || typedPropSchema.default === `[${key}]`) {
         required.push(key);
       }
     }
