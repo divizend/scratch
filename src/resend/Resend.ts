@@ -109,7 +109,7 @@ export class Resend {
       throw new Error(`Failed to fetch Resend domains: ${text}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { data?: ResendDomain[] };
     const domains: ResendDomain[] = data.data || [];
 
     // Extract domain names and filter by verified status

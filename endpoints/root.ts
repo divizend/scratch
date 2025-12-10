@@ -94,7 +94,7 @@ export const root: ScratchEndpointDefinition = {
         if (/style\s*=/i.test(attributes)) {
           attributes = attributes.replace(
             /style\s*=\s*["']([^"']*)["']/i,
-            (m, existingStyle) => {
+            (_m: string, existingStyle: string) => {
               return `style="${existingStyle}; ${style}"`;
             }
           );
