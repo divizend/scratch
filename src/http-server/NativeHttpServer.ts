@@ -296,6 +296,17 @@ export class NativeHttpServer implements HttpServer {
   }
 
   getFetchHandler(): (request: Request) => Promise<Response> {
+    // Helper to get header value from either Headers object or plain object
+    const getHeader = (headers: any, name: string): string | null => {
+      if (headers && typeof headers.get === "function") {
+        return headers.get(name) || headers.get(name.toLowerCase());
+      }
+      if (headers && typeof headers === "object") {
+        return headers[name] || headers[name.toLowerCase()] || null;
+      }
+      return null;
+    };
+
     // Convert Fetch API Request to Node.js-like request/response
     return async (request: Request): Promise<Response> => {
       // Handle relative URLs (Vercel may pass relative URLs)
@@ -306,11 +317,11 @@ export class NativeHttpServer implements HttpServer {
       ) {
         // Construct absolute URL from request headers
         const host =
-          request.headers.get("host") ||
-          request.headers.get("Host") ||
+          getHeader(request.headers, "host") ||
+          getHeader(request.headers, "Host") ||
           "localhost";
         const protocol =
-          request.headers.get("x-forwarded-proto") ||
+          getHeader(request.headers, "x-forwarded-proto") ||
           (host.includes("localhost") ? "http" : "https");
         requestUrl = `${protocol}://${host}${
           requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl
@@ -324,7 +335,7 @@ export class NativeHttpServer implements HttpServer {
       // Read body if present
       let body: any = null;
       if (["POST", "PUT", "PATCH"].includes(method)) {
-        const contentType = request.headers.get("content-type") || "";
+        const contentType = getHeader(request.headers, "content-type") || "";
         if (contentType.includes("application/json")) {
           try {
             body = await request.json();
@@ -342,8 +353,15 @@ export class NativeHttpServer implements HttpServer {
 
       // Create mock Node.js request/response objects
       const headers: Record<string, string> = {};
-      for (const [key, value] of request.headers.entries()) {
-        headers[key] = value;
+      // Handle both Headers object and plain object
+      if (request.headers && typeof request.headers.entries === "function") {
+        for (const [key, value] of request.headers.entries()) {
+          headers[key] = value;
+        }
+      } else if (request.headers && typeof request.headers === "object") {
+        for (const [key, value] of Object.entries(request.headers)) {
+          headers[key] = String(value);
+        }
       }
       // Ensure host header is set (extract from URL if not present)
       if (!headers.host && !headers["host"]) {

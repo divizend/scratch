@@ -37,6 +37,19 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
 }
 
 /**
+ * Helper to get header value from either Headers object or plain object
+ */
+function getHeader(headers: any, name: string): string | null {
+  if (headers && typeof headers.get === "function") {
+    return headers.get(name) || headers.get(name.toLowerCase());
+  }
+  if (headers && typeof headers === "object") {
+    return headers[name] || headers[name.toLowerCase()] || null;
+  }
+  return null;
+}
+
+/**
  * Vercel serverless function handler
  *
  * Vercel will call this function for all routes (due to [...path] catch-all).
@@ -49,8 +62,8 @@ export default async function handler(request: Request): Promise<Response> {
   let requestUrl = request.url;
   if (!requestUrl.startsWith("http://") && !requestUrl.startsWith("https://")) {
     // Construct absolute URL from request headers
-    const host = request.headers.get("host") || request.headers.get("Host") || "localhost";
-    const protocol = request.headers.get("x-forwarded-proto") || 
+    const host = getHeader(request.headers, "host") || getHeader(request.headers, "Host") || "localhost";
+    const protocol = getHeader(request.headers, "x-forwarded-proto") || 
                     (host.includes("localhost") ? "http" : "https");
     requestUrl = `${protocol}://${host}${requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl}`;
     
