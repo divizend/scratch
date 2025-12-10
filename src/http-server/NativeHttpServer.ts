@@ -300,12 +300,21 @@ export class NativeHttpServer implements HttpServer {
     return async (request: Request): Promise<Response> => {
       // Handle relative URLs (Vercel may pass relative URLs)
       let requestUrl = request.url;
-      if (!requestUrl.startsWith("http://") && !requestUrl.startsWith("https://")) {
+      if (
+        !requestUrl.startsWith("http://") &&
+        !requestUrl.startsWith("https://")
+      ) {
         // Construct absolute URL from request headers
-        const host = request.headers.get("host") || request.headers.get("Host") || "localhost";
-        const protocol = request.headers.get("x-forwarded-proto") || 
-                        (host.includes("localhost") ? "http" : "https");
-        requestUrl = `${protocol}://${host}${requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl}`;
+        const host =
+          request.headers.get("host") ||
+          request.headers.get("Host") ||
+          "localhost";
+        const protocol =
+          request.headers.get("x-forwarded-proto") ||
+          (host.includes("localhost") ? "http" : "https");
+        requestUrl = `${protocol}://${host}${
+          requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl
+        }`;
       }
       const url = new URL(requestUrl);
       const method = request.method;
