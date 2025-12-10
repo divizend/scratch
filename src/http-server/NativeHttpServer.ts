@@ -801,9 +801,32 @@ export class NativeHttpServer implements HttpServer {
     source: string,
     filePath: string
   ): Promise<ScratchEndpointDefinition | null> {
+    let tempFile: string | null = null;
+    let importPath: string;
+
     try {
+      // Check if filePath is an absolute path that exists (filesystem loading)
       const absolutePath = resolve(filePath);
-      const module = await import(absolutePath);
+      const { stat } = await import("node:fs/promises");
+      let fileExists = false;
+      try {
+        await stat(absolutePath);
+        fileExists = true;
+      } catch {
+        // File doesn't exist
+      }
+
+      if (fileExists) {
+        // Use existing file path (filesystem loading)
+        importPath = absolutePath;
+      } else {
+        // File doesn't exist, so source is from GitHub - write to temp file
+        tempFile = `/tmp/endpoint_${Date.now()}_${randomUUID()}.ts`;
+        await Bun.write(tempFile, source);
+        importPath = tempFile;
+      }
+
+      const module = await import(importPath);
 
       // Try to find endpoint by filename first
       const fileName = basename(filePath, ".ts");
@@ -829,6 +852,15 @@ export class NativeHttpServer implements HttpServer {
     } catch (error) {
       console.error(`Failed to parse endpoint from ${filePath}:`, error);
       return null;
+    } finally {
+      // Clean up temp file if we created one
+      if (tempFile) {
+        try {
+          await Bun.file(tempFile).unlink();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
   }
 
