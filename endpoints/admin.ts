@@ -7,12 +7,12 @@ export const admin: ScratchEndpointDefinition = {
     text: "admin interface",
   }),
   handler: async (context) => {
-    const html = `<!DOCTYPE html>
+      const html = `<!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Admin Interface</title>
+  <title>Admin Interface</title>
     <link rel="stylesheet" href="/sharedCss" />
     <script src="/sharedJs"></script>
     <style>
@@ -170,10 +170,10 @@ export const admin: ScratchEndpointDefinition = {
         background: #fafafa;
       }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="container">
-      <h1>Admin Interface</h1>
+  <h1>Admin Interface</h1>
 
       <div class="auth-section" id="authSection">
         <p>Enter JWT token to authenticate:</p>
@@ -524,13 +524,13 @@ export const admin: ScratchEndpointDefinition = {
         window.logout = logout;
       })();
     </script>
-  </body>
+</body>
 </html>`;
 
-    return new Response(html, {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+      return new Response(html, {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
   },
   noAuth: true,
 };
