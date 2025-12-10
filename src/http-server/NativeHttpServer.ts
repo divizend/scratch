@@ -801,9 +801,6 @@ export class NativeHttpServer implements HttpServer {
     source: string,
     filePath: string
   ): Promise<ScratchEndpointDefinition | null> {
-    let tempFile: string | null = null;
-    let importPath: string;
-
     try {
       // Check if filePath is an absolute path that exists (filesystem loading)
       const absolutePath = resolve(filePath);
@@ -816,35 +813,94 @@ export class NativeHttpServer implements HttpServer {
         // File doesn't exist
       }
 
+      let module: any;
+
       if (fileExists) {
         // Use existing file path (filesystem loading)
-        importPath = absolutePath;
+        module = await import(absolutePath);
       } else {
-        // File doesn't exist, so source is from GitHub - write to temp file
-        tempFile = `/tmp/endpoint_${Date.now()}_${randomUUID()}.ts`;
-        await Bun.write(tempFile, source);
-        importPath = tempFile;
-      }
+        // File doesn't exist, so source is from GitHub - transpile and evaluate with manual import resolution
+        const projectRoot = process.cwd();
+        const srcIndexPath = resolve(projectRoot, "src", "index.ts");
 
-      const module = await import(importPath);
+        // Import the actual source module to provide imports in eval context
+        const srcModule = await import(srcIndexPath);
+
+        // Replace import statements with variable assignments from provided module
+        let processedSource = source;
+
+        // Replace: import { X, Y } from "../src"
+        processedSource = processedSource.replace(
+          /import\s+{([^}]+)}\s+from\s+["']\.\.\/src["']/g,
+          (match, imports) => {
+            const importList = imports.split(",").map((i: string) => i.trim());
+            return importList
+              .map((imp: string) => {
+                const [name, alias] = imp
+                  .split(" as ")
+                  .map((s: string) => s.trim());
+                const varName = alias || name;
+                return `const ${varName} = srcModule.${name};`;
+              })
+              .join("\n");
+          }
+        );
+
+        // Replace: import X from "../src"
+        processedSource = processedSource.replace(
+          /import\s+(\w+)\s+from\s+["']\.\.\/src["']/g,
+          "const $1 = srcModule;"
+        );
+
+        // Transpile TypeScript to JavaScript
+        const transpiler = new Bun.Transpiler({ loader: "ts" });
+        const js = transpiler.transformSync(processedSource);
+
+        // Evaluate with srcModule in scope
+        const wrappedCode = `
+          (function(srcModule) {
+            const exports = {};
+            const module = { exports };
+            ${js}
+            return module.exports;
+          })
+        `;
+
+        const factory = eval(wrappedCode);
+        const exports = factory(srcModule);
+        module = exports;
+      }
 
       // Try to find endpoint by filename first
       const fileName = basename(filePath, ".ts");
-      if (module[fileName]) {
+      if (module && module[fileName]) {
         return module[fileName] as ScratchEndpointDefinition;
       }
 
       // Search all exports for an endpoint definition
-      const endpoint = Object.values(module).find(
-        (value): value is ScratchEndpointDefinition =>
-          value !== null &&
-          typeof value === "object" &&
-          "block" in value &&
-          "handler" in value
-      );
+      const endpoint =
+        module && typeof module === "object"
+          ? Object.values(module).find(
+              (value): value is ScratchEndpointDefinition =>
+                value !== null &&
+                typeof value === "object" &&
+                "block" in value &&
+                "handler" in value
+            )
+          : null;
 
       if (endpoint) {
         return endpoint;
+      }
+
+      // If module itself is an endpoint definition
+      if (
+        module &&
+        typeof module === "object" &&
+        "block" in module &&
+        "handler" in module
+      ) {
+        return module as ScratchEndpointDefinition;
       }
 
       console.warn(`No endpoint definition found in ${filePath}`);
@@ -852,15 +908,6 @@ export class NativeHttpServer implements HttpServer {
     } catch (error) {
       console.error(`Failed to parse endpoint from ${filePath}:`, error);
       return null;
-    } finally {
-      // Clean up temp file if we created one
-      if (tempFile) {
-        try {
-          await Bun.file(tempFile).unlink();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
     }
   }
 
