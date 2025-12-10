@@ -75,11 +75,13 @@ export class Universe {
    * @returns Promise<Universe> - Fully initialized Universe instance
    * @throws Error if any subsystem fails to initialize
    */
-  static async construct(
-    { gsuite: initGSuite }: { gsuite?: boolean } = {
-      gsuite: true,
-    }
-  ): Promise<Universe> {
+  static async construct({
+    gsuite: initGSuite = true,
+    endpointsDirectory,
+  }: {
+    gsuite?: boolean;
+    endpointsDirectory?: string;
+  } = {}): Promise<Universe> {
     const universe = new Universe();
 
     // Initialize all subsystems in parallel for optimal performance
@@ -196,25 +198,27 @@ export class Universe {
     // Register static files
     universe.httpServer.registerStaticFiles(projectRoot);
 
-    // Load and register endpoints
-    const endpointsDir = resolve(join(cwd(), "endpoints"));
-    await universe.httpServer.loadEndpointsFromDirectory(endpointsDir);
-    const allEndpoints = universe.httpServer.getAllEndpoints();
-    await universe.httpServer.registerEndpoints(allEndpoints);
+    // Load and register endpoints (if directory is provided)
+    if (endpointsDirectory) {
+      const endpointsDir = resolve(endpointsDirectory);
+      await universe.httpServer.loadEndpointsFromDirectory(endpointsDir);
+    }
 
-    // Log all registered endpoints
-    const endpointInfos = await universe.httpServer.getRegisteredEndpoints();
-    console.log("\n📋 Registered Scratch Endpoints:");
-    console.log("=".repeat(50));
-    endpointInfos.forEach((info) => {
-      console.log(
-        `  ${info.method.padEnd(4)} ${info.endpoint.padEnd(30)} ${
-          info.blockType
-        }${info.auth}`
-      );
-    });
-    console.log("=".repeat(50));
-    console.log(`Total: ${endpointInfos.length} endpoints\n`);
+    // Log all registered endpoints (if endpoints were loaded)
+    if (endpointsDirectory) {
+      const endpointInfos = await universe.httpServer.getRegisteredEndpoints();
+      console.log("\n📋 Registered Scratch Endpoints:");
+      console.log("=".repeat(50));
+      endpointInfos.forEach((info) => {
+        console.log(
+          `  ${info.method.padEnd(4)} ${info.endpoint.padEnd(30)} ${
+            info.blockType
+          }${info.auth}`
+        );
+      });
+      console.log("=".repeat(50));
+      console.log(`Total: ${endpointInfos.length} endpoints\n`);
+    }
 
     // Start the server
     const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);

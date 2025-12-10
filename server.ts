@@ -9,9 +9,17 @@
 import { Universe } from "./src";
 import { setUniverse } from "./src/core";
 import { envOrDefault } from "./src/core/Env";
+import { resolve, join } from "node:path";
+import { cwd } from "node:process";
+
+// Get endpoints directory (defaults to ./endpoints)
+const endpointsDir = resolve(join(cwd(), "endpoints"));
 
 // Initialize Universe (this will start the HTTP server automatically)
-const universe = await Universe.construct({ gsuite: true });
+// GSuite is enabled by default, so we don't need to specify it
+const universe = await Universe.construct({
+  endpointsDirectory: endpointsDir,
+});
 setUniverse(universe);
 
 // Get port and fetch handler for Bun

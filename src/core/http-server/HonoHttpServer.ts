@@ -138,63 +138,25 @@ export class HonoHttpServer implements HttpServer {
   }
 
   registerStaticFiles(rootPath: string): void {
-    // Register static routes FIRST (before any middleware that might trigger router building)
-    this.app.use("/*", serveStatic({ root: join(rootPath, "public") }));
+    // Register static routes under /public/ path
+    // This must be registered FIRST (before any middleware that might trigger router building)
+    // Map /public/* to the public/ directory in the file system
+    this.app.use("/public/*", serveStatic({ root: join(rootPath, "public") }));
   }
 
   async registerEndpoints(
     endpoints: ScratchEndpointDefinition[]
   ): Promise<void> {
-    this.initPromise = this.initializeEndpoints(endpoints);
-    await this.initPromise;
-  }
-
-  private async initializeEndpoints(
-    endpoints: ScratchEndpointDefinition[]
-  ): Promise<void> {
-    try {
-      await this.registerScratchEndpoints(endpoints);
-
-      // Stream viewer catch-all
-      let streamViewer: ScratchEndpointDefinition | undefined;
-      for (const ep of endpoints) {
-        const blockDef = await ep.block({});
-        if (blockDef.opcode === "streamViewer") {
-          streamViewer = ep;
-          break;
-        }
-      }
-      if (streamViewer) {
-        const registeredPaths = new Set<string>();
-        for (const ep of endpoints) {
-          const blockDef = await ep.block({});
-          const path =
-            blockDef.opcode === "root"
-              ? "/"
-              : blockDef.opcode === ""
-              ? "/"
-              : `/${blockDef.opcode}`;
-          registeredPaths.add(path);
-        }
-
-        this.app.get("*", async (c, next) => {
-          if (registeredPaths.has(c.req.path)) return next();
-          const result = await streamViewer!.handler({
-            c,
-            query: c.req.query(),
-            userEmail: undefined,
-            universe: undefined,
-          } as any);
-          if (result instanceof Response) return result;
-          return typeof result === "string" ? c.html(result) : c.json(result);
-        });
-      }
-
-      this.isInitialized = true;
-    } catch (error) {
-      console.error("Failed to initialize endpoints:", error);
-      throw error;
+    // Add to endpoints map
+    for (const endpoint of endpoints) {
+      const blockDef = await endpoint.block({});
+      const opcode = blockDef.opcode || "";
+      this.endpoints.set(opcode, endpoint);
     }
+    // Register as HTTP routes
+    await this.registerScratchEndpoints(endpoints);
+    // Build handlers
+    await this.buildHandlersObject();
   }
 
   private async registerScratchEndpoints(
@@ -570,6 +532,7 @@ export class HonoHttpServer implements HttpServer {
     }
 
     const filePaths = await this.iterateEndpointFiles(directoryPath);
+    const loadedEndpoints: ScratchEndpointDefinition[] = [];
 
     for (const filePath of filePaths) {
       try {
@@ -579,14 +542,21 @@ export class HonoHttpServer implements HttpServer {
           const blockDef = await endpoint.block({});
           const opcode = blockDef.opcode || "";
           this.endpoints.set(opcode, endpoint);
+          loadedEndpoints.push(endpoint);
         }
       } catch (error) {
         console.error(`Failed to load endpoint from ${filePath}:`, error);
       }
     }
 
+    // Register endpoints as HTTP routes
+    await this.registerScratchEndpoints(loadedEndpoints);
+
     // Build handlers after loading
     await this.buildHandlersObject();
+
+    // Mark as initialized
+    this.isInitialized = true;
   }
 
   getAllEndpoints(): ScratchEndpointDefinition[] {
