@@ -855,7 +855,73 @@ export class NativeHttpServer implements HttpServer {
 
           // Transpile TypeScript to JavaScript
           const transpiler = new Bun.Transpiler({ loader: "ts" });
-          const js = transpiler.transformSync(processedSource);
+          let js = transpiler.transformSync(processedSource);
+
+          // Convert ES module exports to CommonJS
+          // Pattern 1: export const endpointName = ... -> const endpointName = ...; module.exports.endpointName = endpointName;
+          js = js.replace(/export\s+const\s+(\w+)\s*=/g, (match, varName) => {
+            return `const ${varName} =`;
+          });
+
+          // Pattern 2: export { X, Y } -> module.exports.X = X; module.exports.Y = Y;
+          js = js.replace(/export\s+{\s*([^}]+)\s*}/g, (match, exports) => {
+            const exportList = exports.split(",").map((e: string) => e.trim());
+            return exportList
+              .map((exp: string) => {
+                const [name, alias] = exp
+                  .split(" as ")
+                  .map((s: string) => s.trim());
+                const exportName = alias || name;
+                return `module.exports.${exportName} = ${name};`;
+              })
+              .join("\n");
+          });
+
+          // Pattern 3: export default X -> module.exports.default = X;
+          js = js.replace(
+            /export\s+default\s+(\w+)/g,
+            "module.exports.default = $1"
+          );
+
+          // After removing exports, we need to add the exports back
+          // Extract the endpoint name from filename (e.g., "admin.ts" -> "admin")
+          const endpointName = basename(filePath, ".ts");
+
+          // Find the const declaration for the endpoint name and export it
+          const endpointVarPattern = new RegExp(
+            `const\\s+${endpointName}\\s*=`,
+            "g"
+          );
+          if (endpointVarPattern.test(js)) {
+            // Add export for the endpoint variable
+            js += `\nmodule.exports.${endpointName} = ${endpointName};`;
+          } else {
+            // If endpoint name doesn't match, try to find any const that looks like an endpoint
+            // (has block and handler properties based on the code structure)
+            // For now, export all top-level const declarations
+            const constDeclarations = js.matchAll(/const\s+(\w+)\s*=/g);
+            const varsToExport: string[] = [];
+            for (const match of constDeclarations) {
+              const varName = match[1];
+              // Export if it's a valid identifier and not a common internal variable
+              if (
+                varName &&
+                !["require", "module", "exports", "process", "global"].includes(
+                  varName
+                )
+              ) {
+                varsToExport.push(varName);
+              }
+            }
+            // Export all found variables
+            if (varsToExport.length > 0) {
+              js +=
+                "\n" +
+                varsToExport
+                  .map((v) => `module.exports.${v} = ${v};`)
+                  .join("\n");
+            }
+          }
 
           // Evaluate with srcModule in scope
           const wrappedCode = `
