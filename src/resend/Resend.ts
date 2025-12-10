@@ -62,8 +62,8 @@ export class Resend {
     const key = envOr(
       apiKey,
       "RESEND_API_KEY",
-      "Resend API key is required. Provide it via parameter or RESEND_API_KEY environment variable."
-    );
+        "Resend API key is required. Provide it via parameter or RESEND_API_KEY environment variable."
+      );
     const root = envOrDefault(apiRoot, "RESEND_API_ROOT", "api.resend.com");
 
     // Fetch domains once during construction

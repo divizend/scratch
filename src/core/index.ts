@@ -16,6 +16,8 @@
  */
 
 export * from "./Universe";
+export * from "./Scratch";
+export * from "./Auth";
 export * from "./Fragment";
 export * from "./FragmentServingMode";
 export * from "./URI";

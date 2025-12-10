@@ -5,12 +5,11 @@ import { dirname } from "path";
 import { Universe } from "./src";
 import {
   registerEndpoints,
-  setUniverse,
   registerStaticRoutes,
-  getRegisteredEndpoints,
 } from "./src/server";
+import { getRegisteredEndpoints } from "./src/server/endpoints";
 import { envOrDefault, env } from "./src/core/Env";
-import { getUniverse } from "./src/server/universe";
+import { getUniverse, setUniverse } from "./src/core";
 import { S2 } from "./src/s2";
 
 // Get the directory where this file is located
@@ -20,19 +19,53 @@ const projectRoot = __dirname;
 
 const app = new Hono();
 
-// Initialize Universe instance on startup
-let universe: Universe | null = null;
-(async () => {
+// Register static routes FIRST (before any middleware that might trigger router building)
+registerStaticRoutes(app, projectRoot);
+
+let isInitialized = false;
+const initPromise = initialize();
+
+// Initialize Universe and register endpoints
+async function initialize() {
   try {
-    universe = await Universe.construct({ gsuite: true });
+    // Initialize Universe first
+    const universe = await Universe.construct({ gsuite: true });
     setUniverse(universe);
     console.log("Universe initialized successfully");
-  } catch (error) {
-    console.error("Failed to initialize Universe:", error);
-  }
-})();
 
-// CORS middleware - allow all origins, methods, and headers
+    // Register all Scratch endpoints
+    await registerEndpoints(app);
+
+    // Log all registered endpoints
+    const endpoints = getRegisteredEndpoints();
+    console.log("\n📋 Registered Scratch Endpoints:");
+    console.log("=".repeat(50));
+    const endpointInfos = await Promise.all(
+      endpoints.map(async (ep) => {
+        const blockDef = await ep.block({});
+        const method = blockDef.blockType === "reporter" ? "GET" : "POST";
+        const auth = ep.noAuth ? " (no auth)" : "";
+        return { method, endpoint: ep.endpoint, blockType: blockDef.blockType, auth, text: blockDef.text };
+      })
+    );
+    // Sort alphabetically by text
+    endpointInfos.sort((a, b) => a.text.localeCompare(b.text));
+    endpointInfos.forEach((info) => {
+      console.log(
+        `  ${info.method.padEnd(4)} ${info.endpoint.padEnd(30)} ${info.blockType}${info.auth}`
+      );
+    });
+    console.log("=".repeat(50));
+    console.log(`Total: ${endpoints.length} endpoints\n`);
+
+    isInitialized = true;
+  } catch (error) {
+    console.error("Failed to initialize server:", error);
+    throw error;
+  }
+}
+
+// CORS middleware
 app.use(
   "*",
   cors({
@@ -43,16 +76,22 @@ app.use(
   })
 );
 
+// Middleware to ensure initialization is complete
+app.use("*", async (c, next) => {
+  if (!isInitialized) {
+    await initPromise;
+  }
+  await next();
+});
+
 // Middleware to log all HTTP requests to S2 stream
 app.use("*", async (c, next) => {
-  // Capture request information before processing
   const startTime = Date.now();
   const method = c.req.method;
   const path = c.req.path;
   const query = c.req.query();
   const headers: Record<string, string> = {};
 
-  // Collect all headers
   const headerObj = c.req.header();
   if (headerObj) {
     for (const [key, value] of Object.entries(headerObj)) {
@@ -60,10 +99,8 @@ app.use("*", async (c, next) => {
     }
   }
 
-  // Try to read body (non-blocking, don't await)
   let body: any = null;
   try {
-    // Only try to read body for methods that typically have bodies
     if (["POST", "PUT", "PATCH"].includes(method)) {
       const contentType = c.req.header("content-type") || "";
       if (contentType.includes("application/json")) {
@@ -79,30 +116,24 @@ app.use("*", async (c, next) => {
     // Ignore body reading errors
   }
 
-  // Process the request
   await next();
 
-  // Capture response information
   const duration = Date.now() - startTime;
   const status = c.res.status;
 
-  // Log to S2 stream asynchronously (fire and forget)
+  // Log to S2 stream asynchronously
   (async () => {
     try {
       const universe = getUniverse();
-      if (!universe || !universe.s2) {
-        return; // S2 not available, skip logging
-      }
+      if (!universe?.s2) return;
 
       const hostedAt = env("HOSTED_AT", { required: false });
-      if (!hostedAt) {
-        return; // HOSTED_AT not set, skip logging
-      }
+      if (!hostedAt) return;
 
       const streamName = `${hostedAt}/http/incoming`;
       const basinName = S2.getBasin();
 
-      const requestData = {
+      await universe.s2.appendToStream(basinName, streamName, {
         method,
         path,
         query: Object.keys(query).length > 0 ? query : undefined,
@@ -111,11 +142,8 @@ app.use("*", async (c, next) => {
         status,
         duration,
         timestamp: new Date().toISOString(),
-      };
-
-      await universe.s2.appendToStream(basinName, streamName, requestData);
+      });
     } catch (error) {
-      // Silently ignore logging errors to not affect request processing
       console.error("Failed to log request to S2 stream:", error);
     }
   })();
@@ -124,41 +152,10 @@ app.use("*", async (c, next) => {
 // Middleware to set no-cache headers
 app.use("*", async (c, next) => {
   await next();
-  // Set no-cache headers for all responses
   c.header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
   c.header("Pragma", "no-cache");
   c.header("Expires", "0");
 });
-
-// Register static routes (README only - admin and extension are now endpoints)
-registerStaticRoutes(app, projectRoot);
-
-// Register all Scratch endpoints and log them
-(async () => {
-  // Register all Scratch endpoints
-  await registerEndpoints(app);
-
-
-  // Log all registered endpoints
-  const endpoints = getRegisteredEndpoints();
-  console.log("\n📋 Registered Scratch Endpoints:");
-  console.log("=".repeat(50));
-  await Promise.all(
-    endpoints.map(async (ep) => {
-      // Call block function with empty context to get block definition (await since it returns a Promise)
-      const blockDef = await ep.block({});
-      const method = blockDef.blockType === "reporter" ? "GET" : "POST";
-      const auth = ep.noAuth ? " (no auth)" : "";
-      console.log(
-        `  ${method.padEnd(4)} ${ep.endpoint.padEnd(30)} ${
-          blockDef.blockType
-        }${auth}`
-      );
-    })
-  );
-  console.log("=".repeat(50));
-  console.log(`Total: ${endpoints.length} endpoints\n`);
-})();
 
 const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
 console.log(`🚀 Server running on http://localhost:${port}`);

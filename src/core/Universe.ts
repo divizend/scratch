@@ -22,6 +22,8 @@ import {
   JsonSchemaValidator,
   S2,
 } from "..";
+import { EndpointManager } from "../endpoint-manager";
+import { Auth } from "./Auth";
 
 /**
  * Enumeration of available Universe modules
@@ -35,6 +37,10 @@ export enum UniverseModule {
   EmailQueue = "emailQueue",
   /** S2 streamstore for durable stream storage */
   S2 = "s2",
+  /** Endpoints for Scratch block definitions */
+  Endpoints = "endpoints",
+  /** Authentication module */
+  Auth = "auth",
 }
 
 export class Universe {
@@ -48,6 +54,10 @@ export class Universe {
   public s2!: S2;
   /** JSON Schema validator for request validation */
   public jsonSchemaValidator: JsonSchemaValidator = new JsonSchemaValidator();
+  /** Endpoint manager for Scratch endpoint definitions */
+  public endpoints: EndpointManager = new EndpointManager();
+  /** Authentication module (enabled by default) */
+  public auth: Auth = new Auth();
 
   /**
    * Constructs and initializes a new Universe instance
@@ -201,6 +211,8 @@ export class Universe {
         return !!this.emailQueue;
       case UniverseModule.S2:
         return !!this.s2;
+      case UniverseModule.Auth:
+        return !!this.auth;
       default:
         return false;
     }
@@ -284,4 +296,21 @@ export class Universe {
 
     return health;
   }
+}
+
+// Global singleton instance
+let universeInstance: Universe | null = null;
+
+/**
+ * Get the global Universe singleton instance
+ */
+export function getUniverse(): Universe | null {
+  return universeInstance;
+}
+
+/**
+ * Set the global Universe singleton instance
+ */
+export function setUniverse(universe: Universe | null): void {
+  universeInstance = universe;
 }

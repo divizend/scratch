@@ -82,7 +82,7 @@ export class GSuite {
         errorMessage:
           "No GCP credentials found. Please set GCP_CLIENT_EMAIL_<identifier>, GCP_PRIVATE_KEY_<identifier> and GCP_ADMIN_USER_<identifier> environment variables.",
       }
-    );
+      );
 
     const orgConfigs: {
       [org: string]: GSuiteOrgConfig;
