@@ -156,7 +156,7 @@ export class NativeHttpServer implements HttpServer {
       const query = this.parseQuery(req.url || "");
       const authHeader = req.headers.authorization || "";
       const requestBody = (req as any).body;
-      
+
       // Extract request host for extension generation
       const requestHost = req.headers.host || req.headers["host"] || "";
 
@@ -608,12 +608,12 @@ export class NativeHttpServer implements HttpServer {
         throw new Error("Opcode cannot be empty");
       }
 
-              // DELETE: Remove from endpoints KV store
-              const existed = this.endpoints.has(opcode);
-              this.endpoints.delete(opcode);
+      // DELETE: Remove from endpoints KV store
+      const existed = this.endpoints.has(opcode);
+      this.endpoints.delete(opcode);
 
-              if (existed) {
-                return {
+      if (existed) {
+        return {
           success: true,
           message: `Endpoint "${opcode}" removed successfully`,
         };
