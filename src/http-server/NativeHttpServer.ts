@@ -32,6 +32,10 @@ import {
   Middleware,
 } from "./middlewares";
 
+// Minimal structured logger
+const log = (record: Record<string, unknown>) =>
+  console.log(JSON.stringify(record));
+
 export class NativeHttpServer implements HttpServer {
   private server: Server | null = null;
   private universe: Universe;
@@ -92,6 +96,13 @@ export class NativeHttpServer implements HttpServer {
   ): Promise<void> {
     if (index >= this.middlewares.length) {
       // All middlewares executed, now handle routing
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "middleware_chain_complete",
+        req_id: ctx.metadata.requestId,
+        path: ctx.context.path,
+      });
       await this.handleRouting(ctx);
       return;
     }
@@ -122,6 +133,15 @@ export class NativeHttpServer implements HttpServer {
     const method = req.method || "GET";
     const path = context.path || "";
 
+    log({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "handle_routing_start",
+      req_id: ctx.metadata.requestId,
+      method,
+      path,
+    });
+
     // Extract opcode from path (remove leading slash, handle empty path)
     // Map root path "/" to "root" endpoint
     let opcode =
@@ -132,14 +152,38 @@ export class NativeHttpServer implements HttpServer {
       opcode = "root";
     }
 
+    log({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "opcode_extracted",
+      req_id: ctx.metadata.requestId,
+      opcode,
+    });
+
     // Look up endpoint directly from KV store (current state, no cache)
     const endpoint = this.endpoints.get(opcode);
 
     if (!endpoint) {
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "endpoint_not_found",
+        req_id: ctx.metadata.requestId,
+        opcode,
+        total_endpoints: this.endpoints.size,
+      });
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Not found" }));
       return;
     }
+
+    log({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "endpoint_found",
+      req_id: ctx.metadata.requestId,
+      opcode,
+    });
 
     // Get endpoint metadata directly from endpoint definition
     const blockDef = await endpoint.block({});
@@ -161,12 +205,26 @@ export class NativeHttpServer implements HttpServer {
     }
 
     try {
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "building_handler",
+        req_id: ctx.metadata.requestId,
+        opcode,
+      });
       // Build handler on-demand from current endpoint (always fresh)
       const wrappedHandler = await wrapHandlerWithAuthAndValidation({
         universe: this.universe,
         endpoint,
         noAuth: endpoint.noAuth || false,
         requiredModules: endpoint.requiredModules || [],
+      });
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "handler_built",
+        req_id: ctx.metadata.requestId,
+        opcode,
       });
 
       const query = this.parseQuery(req.url || "");
@@ -182,6 +240,13 @@ export class NativeHttpServer implements HttpServer {
         requestHost: requestHost,
       };
 
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "executing_handler",
+        req_id: ctx.metadata.requestId,
+        opcode,
+      });
       // Execute handler with current endpoint
       const result = await wrappedHandler(
         scratchContext,
@@ -189,9 +254,24 @@ export class NativeHttpServer implements HttpServer {
         requestBody,
         authHeader
       );
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "handler_completed",
+        req_id: ctx.metadata.requestId,
+        opcode,
+        result_type: typeof result,
+      });
 
       // Handle the result
       handleHandlerResult(result, res);
+      log({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "response_sent",
+        req_id: ctx.metadata.requestId,
+        opcode,
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -207,6 +287,15 @@ export class NativeHttpServer implements HttpServer {
           ? 503
           : 500;
 
+      log({
+        ts: new Date().toISOString(),
+        level: "error",
+        event: "handler_error",
+        req_id: ctx.metadata.requestId,
+        opcode,
+        error: errorMessage,
+        statusCode,
+      });
       res.writeHead(statusCode, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: errorMessage }));
     }
@@ -233,6 +322,7 @@ export class NativeHttpServer implements HttpServer {
       context: {
         universe: this.universe,
         path,
+        query,
       },
       metadata: {},
     };

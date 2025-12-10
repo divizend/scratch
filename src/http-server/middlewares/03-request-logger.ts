@@ -83,6 +83,15 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
     content_type: req.headers?.["content-type"] || undefined,
   });
 
+  log({
+    ts: new Date().toISOString(),
+    level: "info",
+    event: "after_request_log",
+    req_id: reqId,
+    path: urlObj.pathname,
+    query_keys: Object.keys(query),
+  });
+
   // Track response status and length
   let statusCode = 200;
   let responseLength: number | undefined = undefined;
