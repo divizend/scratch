@@ -22,8 +22,14 @@ import {
   JsonSchemaValidator,
   S2,
 } from "..";
-import { EndpointManager } from "../endpoint-manager";
 import { Auth } from "./Auth";
+import { HttpServer } from "./http-server";
+import { HonoHttpServer } from "./http-server/HonoHttpServer";
+import { resolve, join } from "node:path";
+import { cwd } from "node:process";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import { envOrDefault } from "./Env";
 
 /**
  * Enumeration of available Universe modules
@@ -54,10 +60,10 @@ export class Universe {
   public s2!: S2;
   /** JSON Schema validator for request validation */
   public jsonSchemaValidator: JsonSchemaValidator = new JsonSchemaValidator();
-  /** Endpoint manager for Scratch endpoint definitions */
-  public endpoints: EndpointManager = new EndpointManager();
   /** Authentication module (enabled by default) */
   public auth: Auth = new Auth();
+  /** HTTP server for handling requests */
+  public httpServer!: HttpServer;
 
   /**
    * Constructs and initializes a new Universe instance
@@ -178,6 +184,42 @@ export class Universe {
     }
 
     universe.emailQueue = new EmailQueue(profiles);
+
+    // Initialize HTTP server
+    universe.httpServer = new HonoHttpServer(universe);
+
+    // Get project root for static files
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const projectRoot = resolve(join(__dirname, "..", "..", ".."));
+
+    // Register static files
+    universe.httpServer.registerStaticFiles(projectRoot);
+
+    // Load and register endpoints
+    const endpointsDir = resolve(join(cwd(), "endpoints"));
+    await universe.httpServer.loadEndpointsFromDirectory(endpointsDir);
+    const allEndpoints = universe.httpServer.getAllEndpoints();
+    await universe.httpServer.registerEndpoints(allEndpoints);
+
+    // Log all registered endpoints
+    const endpointInfos = await universe.httpServer.getRegisteredEndpoints();
+    console.log("\n📋 Registered Scratch Endpoints:");
+    console.log("=".repeat(50));
+    endpointInfos.forEach((info) => {
+      console.log(
+        `  ${info.method.padEnd(4)} ${info.endpoint.padEnd(30)} ${
+          info.blockType
+        }${info.auth}`
+      );
+    });
+    console.log("=".repeat(50));
+    console.log(`Total: ${endpointInfos.length} endpoints\n`);
+
+    // Start the server
+    const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
+    await universe.httpServer.start(port);
+
     return universe;
   }
 
