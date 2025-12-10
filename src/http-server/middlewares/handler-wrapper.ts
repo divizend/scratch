@@ -79,11 +79,12 @@ export async function wrapHandlerWithAuthAndValidation(
       }
     } catch {}
 
-    // Update context with user email and ensure universe is set
+    // Update context with user email, authHeader, and ensure universe is set
     const enrichedContext: ScratchContext = {
       ...context,
       userEmail,
       universe: universe,
+      authHeader: authHeader, // Store authHeader for nested calls
     };
 
     // Module validation
@@ -112,6 +113,7 @@ export async function wrapHandlerWithAuthAndValidation(
             Object.keys(schema).map((key) => [key, query[key] || undefined])
           )
         : requestBody || {};
+      
 
       // Handle JSON type properties
       if (schema) {
@@ -123,7 +125,11 @@ export async function wrapHandlerWithAuthAndValidation(
             data[key] !== ""
           ) {
             try {
-              const parsed = JSON.parse(data[key]);
+              // If data[key] is already an object, use it directly
+              let parsed = data[key];
+              if (typeof data[key] === 'string') {
+                parsed = JSON.parse(data[key]);
+              }
               if (propSchema.schema) {
                 const wrappedSchema: JsonSchema = {
                   type: "object",
@@ -215,8 +221,13 @@ function constructJsonSchema(schema?: ScratchBlock["schema"]): JsonSchema {
         _jsonSchema: propSchema.schema,
       };
     } else {
-      properties[key] = propSchema;
-      required.push(key);
+      // Copy schema but exclude non-JSON-Schema fields
+      const { default: _, description: __, ...jsonSchemaProps } = propSchema;
+      properties[key] = jsonSchemaProps;
+      // Only add to required if there's no default or default is a placeholder
+      if (!propSchema.default || propSchema.default === `[${key}]`) {
+        required.push(key);
+      }
     }
   }
   return {

@@ -5,7 +5,7 @@
  * Currently, only NativeHttpServer is implemented using Node's native http module.
  */
 
-import { ScratchEndpointDefinition } from "../core/Scratch";
+import { ScratchEndpointDefinition, ScratchContext } from "../core/Scratch";
 
 export interface HttpServer {
   /**
@@ -75,16 +75,35 @@ export interface HttpServer {
    */
   getHandler(
     opcode: string
-  ): Promise<((context: any) => Promise<any>) | undefined>;
+  ): Promise<
+    | ((
+        context: ScratchContext,
+        query?: Record<string, string>,
+        requestBody?: any,
+        authHeader?: string
+      ) => Promise<any>)
+    | undefined
+  >;
 
   /**
-   * Register an endpoint from TypeScript source code
+   * Register an endpoint from TypeScript source code (PUT operation - always overwrites)
    * @param source - TypeScript source code for the endpoint
    * @returns Promise that resolves with registration result
    */
   registerEndpoint(source: string): Promise<{
     success: boolean;
     opcode?: string;
+    message?: string;
+    error?: string;
+  }>;
+
+  /**
+   * Remove an endpoint by opcode (DELETE operation)
+   * @param opcode - The opcode of the endpoint to remove
+   * @returns Promise that resolves with removal result
+   */
+  removeEndpoint(opcode: string): Promise<{
+    success: boolean;
     message?: string;
     error?: string;
   }>;

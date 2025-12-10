@@ -339,32 +339,15 @@ class BasicParser {
     const endpointName = parts[0];
     const args = parts.slice(1);
 
-    // Build arguments object - assume endpoint expects named parameters
-    const argsObj: string[] = [];
-    for (let j = 0; j < args.length; j++) {
-      const arg = args[j];
-      // Try to infer parameter name from common patterns
-      const paramName =
-        j === 0 && endpointName.includes("Stream")
-          ? "streamName"
-          : j === 0 && endpointName.includes("Email")
-          ? "to"
-          : j === 0
-          ? "value"
-          : `param${j}`;
-      argsObj.push(`${paramName}: ${this.valueParser.parse(arg)}`);
-    }
-    const argsStr = argsObj.length > 0 ? `{ ${argsObj.join(", ")} }` : "{}";
+    // Parse arguments
+    const parsedArgs = args.map((arg) => this.valueParser.parse(arg));
+    const argsStr = parsedArgs.join(", ");
 
+    // Use Universe.call() method for clean endpoint calling
     this.statements.push(
       `${" ".repeat(
         this.indent
-      )}const handler = await context.universe!.httpServer.getHandler("${endpointName}");`
-    );
-    this.statements.push(
-      `${" ".repeat(
-        this.indent
-      )}if (handler) await handler({ ...context, inputs: ${argsStr} });`
+      )}context.result = await context.universe!.call(context, "${endpointName}"${argsStr ? `, ${argsStr}` : ""});`
     );
   }
 }

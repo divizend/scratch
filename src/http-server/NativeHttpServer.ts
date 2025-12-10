@@ -32,41 +32,15 @@ import {
   Middleware,
 } from "./middlewares";
 
-type RouteHandler = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  context: ScratchContext
-) => Promise<void>;
-
-interface Route {
-  method: string;
-  path: string;
-  handler: RouteHandler;
-  opcode: string;
-}
-
 export class NativeHttpServer implements HttpServer {
   private server: Server | null = null;
   private universe: Universe;
   private isInitialized: boolean = false;
   private initPromise: Promise<void> | null = null;
+  // Single source of truth: endpoints KV store
   private endpoints: Map<string, ScratchEndpointDefinition> = new Map();
-  private handlersObject: Record<
-    string,
-    (
-      context: ScratchContext,
-      query?: Record<string, string>,
-      requestBody?: any,
-      authHeader?: string
-    ) => Promise<any>
-  > = {};
-  private routes: Route[] = [];
   private staticRoot: string | null = null;
   private middlewares: Middleware[] = [];
-  private endpointMetadata: Map<
-    string,
-    { noAuth?: boolean; requiredModules?: UniverseModule[] }
-  > = new Map();
 
   constructor(universe: Universe) {
     this.universe = universe;
@@ -138,32 +112,87 @@ export class NativeHttpServer implements HttpServer {
     const method = req.method || "GET";
     const path = context.path || "";
 
-    // Find matching route
-    let matchedRoute: Route | null = null;
-    for (const route of this.routes) {
-      if (route.method.toLowerCase() === method.toLowerCase()) {
-        if (route.path === path || (route.path === "/" && path === "")) {
-          matchedRoute = route;
-          break;
-        }
-      }
-    }
+    // Extract opcode from path (remove leading slash, handle empty path)
+    const opcode =
+      path === "/" ? "" : path.startsWith("/") ? path.substring(1) : path;
 
-    if (!matchedRoute) {
+    // Look up endpoint directly from KV store (current state, no cache)
+    const endpoint = this.endpoints.get(opcode);
+
+    if (!endpoint) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Not found" }));
       return;
     }
 
-    try {
-      await matchedRoute.handler(req, res, context);
-    } catch (error) {
+    // Get endpoint metadata directly from endpoint definition
+    const blockDef = await endpoint.block({});
+    if (!blockDef.opcode || blockDef.opcode === "") {
       res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Endpoint opcode cannot be empty" }));
+      return;
+    }
+
+    const expectedMethod = blockDef.blockType === "reporter" ? "GET" : "POST";
+    if (method.toUpperCase() !== expectedMethod) {
+      res.writeHead(405, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: `Method not allowed. Expected ${expectedMethod}`,
         })
       );
+      return;
+    }
+
+    try {
+      // Build handler on-demand from current endpoint (always fresh)
+      const wrappedHandler = await wrapHandlerWithAuthAndValidation({
+        universe: this.universe,
+        endpoint,
+        noAuth: endpoint.noAuth || false,
+        requiredModules: endpoint.requiredModules || [],
+      });
+
+      const query = this.parseQuery(req.url || "");
+      const authHeader = req.headers.authorization || "";
+      const requestBody = (req as any).body;
+      
+      // Extract request host for extension generation
+      const requestHost = req.headers.host || req.headers["host"] || "";
+
+      const scratchContext: ScratchContext = {
+        universe: this.universe,
+        authHeader: authHeader,
+        requestHost: requestHost,
+      };
+
+      // Execute handler with current endpoint
+      const result = await wrappedHandler(
+        scratchContext,
+        query,
+        requestBody,
+        authHeader
+      );
+
+      // Handle the result
+      handleHandlerResult(result, res);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      const statusCode =
+        errorMessage.includes("authentication") ||
+        errorMessage.includes("authorization") ||
+        errorMessage.includes("token")
+          ? 401
+          : errorMessage.includes("Validation failed") ||
+            errorMessage.includes("Invalid")
+          ? 400
+          : errorMessage.includes("modules not available")
+          ? 503
+          : 500;
+
+      res.writeHead(statusCode, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: errorMessage }));
     }
   }
 
@@ -212,126 +241,21 @@ export class NativeHttpServer implements HttpServer {
     this.setupMiddlewares();
   }
 
+  /**
+   * PUT operation: Add/overwrite endpoints in KV store
+   */
   async registerEndpoints(
     endpoints: ScratchEndpointDefinition[]
   ): Promise<void> {
-    // Add to endpoints map
+    // PUT: Always overwrite in endpoints KV store
     for (const endpoint of endpoints) {
       const blockDef = await endpoint.block({});
       if (!blockDef.opcode || blockDef.opcode === "") {
         throw new Error("Endpoint opcode cannot be empty");
       }
       this.endpoints.set(blockDef.opcode, endpoint);
+      console.log(`[KV Store] PUT endpoint: ${blockDef.opcode}`);
     }
-    // Register as HTTP routes
-    await this.registerScratchEndpoints(endpoints);
-    // Build handlers
-    await this.buildHandlersObject();
-  }
-
-  private async registerScratchEndpoints(
-    endpoints: ScratchEndpointDefinition[]
-  ): Promise<void> {
-    await Promise.all(
-      endpoints.map((endpoint) =>
-        this.registerScratchEndpoint({
-          block: endpoint.block,
-          handler: endpoint.handler,
-          noAuth: endpoint.noAuth,
-          requiredModules: endpoint.requiredModules,
-        })
-      )
-    );
-  }
-
-  private async registerScratchEndpoint({
-    block,
-    handler,
-    noAuth = false,
-    requiredModules = [],
-  }: {
-    block: (context: ScratchContext) => Promise<ScratchBlock>;
-    handler: (context: ScratchContext) => Promise<any>;
-    noAuth?: boolean;
-    requiredModules?: UniverseModule[];
-  }) {
-    const blockDef = await block({});
-    if (!blockDef.opcode || blockDef.opcode === "") {
-      throw new Error("Endpoint opcode cannot be empty");
-    }
-    const storedOpcode = blockDef.opcode;
-    const endpoint = `/${storedOpcode}`;
-    const method = blockDef.blockType === "reporter" ? "GET" : "POST";
-
-    // Remove existing route with same method and path (overwrite)
-    this.routes = this.routes.filter(
-      (r) => !(r.method === method && r.path === endpoint)
-    );
-
-    // Store metadata for handler wrapping
-    this.endpointMetadata.set(storedOpcode, {
-      noAuth,
-      requiredModules,
-    });
-
-    // Create route handler - simplified, auth/validation is in wrapped handler
-    const routeHandler: RouteHandler = async (req, res, baseContext) => {
-      const query = this.parseQuery(req.url || "");
-      const authHeader = req.headers.authorization;
-      const requestBody = (req as any).body;
-
-      // Create minimal context (only userEmail, inputs, universe)
-      const context: ScratchContext = {
-        universe: this.universe,
-      };
-
-      try {
-        // Get the wrapped handler from handlersObject
-        const wrappedHandler = this.handlersObject[storedOpcode];
-        if (!wrappedHandler) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Handler not found" }));
-          return;
-        }
-
-        // Execute the wrapped handler (includes auth and validation)
-        // Pass query, requestBody, and authHeader as separate parameters
-        const result = await wrappedHandler(
-          context,
-          query,
-          requestBody,
-          authHeader
-        );
-
-        // Handle the result
-        handleHandlerResult(result, res);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        const statusCode =
-          errorMessage.includes("authentication") ||
-          errorMessage.includes("authorization") ||
-          errorMessage.includes("token")
-            ? 401
-            : errorMessage.includes("Validation failed") ||
-              errorMessage.includes("Invalid")
-            ? 400
-            : errorMessage.includes("modules not available")
-            ? 503
-            : 500;
-
-        res.writeHead(statusCode, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: errorMessage }));
-      }
-    };
-
-    // Add route
-    this.routes.push({
-      method,
-      path: endpoint,
-      handler: routeHandler,
-      opcode: storedOpcode,
-    });
   }
 
   async start(port: number): Promise<void> {
@@ -499,11 +423,8 @@ export class NativeHttpServer implements HttpServer {
       }
     }
 
-    // Register endpoints as HTTP routes
-    await this.registerScratchEndpoints(loadedEndpoints);
-
-    // Build handlers after loading
-    await this.buildHandlersObject();
+    // PUT: Add all loaded endpoints to KV store
+    await this.registerEndpoints(loadedEndpoints);
 
     // Mark as initialized
     this.isInitialized = true;
@@ -513,6 +434,9 @@ export class NativeHttpServer implements HttpServer {
     return Array.from(this.endpoints.values());
   }
 
+  /**
+   * Get handlers computed from current endpoints KV store (always fresh)
+   */
   async getEndpointHandlers(): Promise<
     Record<
       string,
@@ -524,12 +448,23 @@ export class NativeHttpServer implements HttpServer {
       ) => Promise<any>
     >
   > {
-    if (!Object.keys(this.handlersObject).length) {
-      await this.buildHandlersObject();
+    const handlers: Record<string, any> = {};
+    // Always compute from current endpoints KV store
+    for (const [opcode, endpoint] of this.endpoints.entries()) {
+      const wrappedHandler = await wrapHandlerWithAuthAndValidation({
+        universe: this.universe,
+        endpoint,
+        noAuth: endpoint.noAuth || false,
+        requiredModules: endpoint.requiredModules || [],
+      });
+      handlers[opcode] = wrappedHandler;
     }
-    return this.handlersObject;
+    return handlers;
   }
 
+  /**
+   * Get handler for specific opcode from current endpoints KV store (always fresh)
+   */
   async getHandler(
     opcode: string
   ): Promise<
@@ -541,34 +476,18 @@ export class NativeHttpServer implements HttpServer {
       ) => Promise<any>)
     | undefined
   > {
-    const handlers = await this.getEndpointHandlers();
-    return handlers[opcode];
-  }
-
-  private async buildHandlersObject(): Promise<void> {
-    this.handlersObject = {};
-    const endpoints = this.getAllEndpoints();
-    for (const endpoint of endpoints) {
-      const blockDef = await endpoint.block({});
-      if (!blockDef.opcode || blockDef.opcode === "") {
-        throw new Error("Endpoint opcode cannot be empty");
-      }
-      const opcode = blockDef.opcode;
-      const metadata = this.endpointMetadata.get(opcode) || {
-        noAuth: endpoint.noAuth,
-        requiredModules: endpoint.requiredModules,
-      };
-
-      // Wrap handler with auth and validation
-      const wrappedHandler = await wrapHandlerWithAuthAndValidation({
-        universe: this.universe,
-        endpoint,
-        noAuth: metadata.noAuth,
-        requiredModules: metadata.requiredModules,
-      });
-
-      this.handlersObject[opcode] = wrappedHandler;
+    // Always look up from current endpoints KV store
+    const endpoint = this.endpoints.get(opcode);
+    if (!endpoint) {
+      return undefined;
     }
+    // Build handler on-demand from current endpoint
+    return await wrapHandlerWithAuthAndValidation({
+      universe: this.universe,
+      endpoint,
+      noAuth: endpoint.noAuth || false,
+      requiredModules: endpoint.requiredModules || [],
+    });
   }
 
   private async iterateEndpointFiles(directoryPath: string): Promise<string[]> {
@@ -618,6 +537,10 @@ export class NativeHttpServer implements HttpServer {
     }
   }
 
+  /**
+   * PUT operation: Register/overwrite an endpoint from TypeScript source code
+   * Simple KV store operation - just evaluate and store
+   */
   async registerEndpoint(source: string): Promise<{
     success: boolean;
     opcode?: string;
@@ -625,17 +548,12 @@ export class NativeHttpServer implements HttpServer {
     error?: string;
   }> {
     try {
-      // Create a temporary file to evaluate the TypeScript code
+      // Create temp file, evaluate, and store - that's it
       const tempFile = `/tmp/endpoint_${Date.now()}_${randomUUID()}.ts`;
-
-      // Write source to temp file
       await Bun.write(tempFile, source);
 
       try {
-        // Import the module
         const module = await import(tempFile);
-
-        // Find the endpoint definition
         const endpoint = Object.values(module).find(
           (value): value is ScratchEndpointDefinition =>
             value !== null &&
@@ -648,45 +566,62 @@ export class NativeHttpServer implements HttpServer {
           throw new Error("No endpoint definition found in source code");
         }
 
-        // Get the opcode
         const blockDef = await endpoint.block({});
         if (!blockDef.opcode || blockDef.opcode === "") {
           throw new Error("Endpoint opcode cannot be empty");
         }
-        const opcode = blockDef.opcode;
 
-        // Add to endpoints map (overwrites if exists)
-        this.endpoints.set(opcode, endpoint);
-
-        // Remove existing routes with same opcode (before registering new ones)
-        this.routes = this.routes.filter((r) => r.opcode !== opcode);
-
-        // Register the endpoint (this will add HTTP routes and build handlers)
-        await this.registerEndpoints([endpoint]);
-
-        // Ensure handlers are built (registerEndpoints already does this, but be explicit)
-        await this.buildHandlersObject();
-
-        // Clean up temp file
-        try {
-          await Bun.file(tempFile).unlink();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
+        // PUT: Store in KV store (that's all!)
+        this.endpoints.set(blockDef.opcode, endpoint);
 
         return {
           success: true,
-          opcode,
-          message: `Endpoint "${opcode}" registered successfully`,
+          opcode: blockDef.opcode,
+          message: `Endpoint "${blockDef.opcode}" registered successfully`,
         };
-      } catch (error: any) {
-        // Clean up temp file on error
+      } finally {
+        // Always clean up temp file
         try {
           await Bun.file(tempFile).unlink();
-        } catch (e) {
+        } catch {
           // Ignore cleanup errors
         }
-        throw error;
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || String(error),
+      };
+    }
+  }
+
+  /**
+   * DELETE operation: Remove an endpoint by opcode (KV store behavior)
+   */
+  async removeEndpoint(opcode: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      if (!opcode || opcode === "") {
+        throw new Error("Opcode cannot be empty");
+      }
+
+              // DELETE: Remove from endpoints KV store
+              const existed = this.endpoints.has(opcode);
+              this.endpoints.delete(opcode);
+
+              if (existed) {
+                return {
+          success: true,
+          message: `Endpoint "${opcode}" removed successfully`,
+        };
+      } else {
+        return {
+          success: true,
+          message: `Endpoint "${opcode}" was not registered`,
+        };
       }
     } catch (error: any) {
       return {

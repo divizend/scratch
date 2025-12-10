@@ -15,7 +15,7 @@ export const compileBasic: ScratchEndpointDefinition = {
       },
       opcode: {
         type: "string",
-        default: "myEndpoint",
+        default: "basicCounter",
         description: "Opcode for the generated endpoint",
       },
     },
@@ -26,7 +26,7 @@ export const compileBasic: ScratchEndpointDefinition = {
     try {
       const typescript = compileBasicToTypeScript(
         code || "",
-        opcode || "myEndpoint"
+        opcode || "basicCounter"
       );
       return {
         success: true,

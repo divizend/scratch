@@ -93,7 +93,7 @@ export const basicRepl: ScratchEndpointDefinition = {
     <div class="repl-container">
       <div class="form-group">
         <label for="opcode">Endpoint Opcode:</label>
-        <input type="text" id="opcode" placeholder="myEndpoint" value="myEndpoint" />
+        <input type="text" id="opcode" placeholder="basicCounter" value="basicCounter" />
       </div>
 
       <div class="code-section">
@@ -203,7 +203,7 @@ export const basicRepl: ScratchEndpointDefinition = {
 
       function clearAll() {
         document.getElementById("basicCode").value = "";
-        document.getElementById("opcode").value = "myEndpoint";
+          document.getElementById("opcode").value = "basicCounter";
         document.getElementById("outputSection").style.display = "none";
         document.getElementById("registerBtn").disabled = true;
         compiledTypeScript = null;

@@ -25,6 +25,7 @@ import {
 import { Auth } from "./Auth";
 import { HttpServer } from "../http-server";
 import { NativeHttpServer } from "../http-server/NativeHttpServer";
+import { ScratchContext, ScratchBlock } from "./Scratch";
 import { resolve, join } from "node:path";
 import { cwd } from "node:process";
 import { fileURLToPath } from "url";
@@ -264,6 +265,50 @@ export class Universe {
       default:
         return false;
     }
+  }
+
+  /**
+   * Call an endpoint by name with the given arguments
+   * Maps arguments to parameter names based on the endpoint's schema
+   * @param context - The Scratch context to use for the call
+   * @param endpointName - The name (opcode) of the endpoint to call
+   * @param ...args - Arguments to pass to the endpoint (will be mapped to parameter names)
+   * @returns Promise<any> - The result from the endpoint handler
+   */
+  async call(
+    context: ScratchContext,
+    endpointName: string,
+    ...args: any[]
+  ): Promise<any> {
+    const handler = await this.httpServer.getHandler(endpointName);
+    if (!handler) {
+      throw new Error(`Endpoint handler not found: ${endpointName}`);
+    }
+
+    // Find endpoint definition to get schema for argument mapping
+    let endpointBlock: ScratchBlock | null = null;
+    for (const e of this.httpServer.getAllEndpoints()) {
+      const block = await e.block({});
+      if (block.opcode === endpointName) {
+        endpointBlock = block;
+        break;
+      }
+    }
+
+    // Map arguments to parameter names
+    const paramNames = endpointBlock?.schema
+      ? Object.keys(endpointBlock.schema)
+      : [];
+    const callInputs =
+      args.length > 0
+        ? Object.fromEntries(
+            args.map((arg, i) => [paramNames[i] || `param${i}`, arg])
+          )
+        : {};
+
+    // Call the handler
+    const callContext = { ...context, universe: this };
+    return await handler(callContext, {}, callInputs, context.authHeader);
   }
 
   /**

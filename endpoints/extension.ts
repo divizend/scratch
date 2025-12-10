@@ -19,12 +19,59 @@ function generateExtensionInfo() {
   };
 }
 
-// Determine the base URL for the extension
-function getBaseUrl(): string {
+// Determine the base URL for the extension based on the request
+function getBaseUrl(requestHost?: string): string {
   const HOSTED_AT = envOrDefault(undefined, "HOSTED_AT", "");
   const port = envOrDefault(undefined, "PORT", "3000");
 
-  // If HOSTED_AT is set, use it (production)
+  // If we have a request host, use it to detect the environment
+  if (requestHost) {
+    // Normalize requestHost (remove port if it's the default HTTP/HTTPS port)
+    const normalizedHost = requestHost.replace(/:80$/, "").replace(/:443$/, "");
+
+    // Check if it's localhost or 127.0.0.1
+    if (
+      normalizedHost.includes("localhost") ||
+      normalizedHost.includes("127.0.0.1") ||
+      normalizedHost.startsWith("[::1]")
+    ) {
+      // Extract port from host if present (e.g., "localhost:3000")
+      const hostParts = normalizedHost.split(":");
+      if (hostParts.length > 1) {
+        const detectedPort = hostParts[hostParts.length - 1];
+        return `http://${hostParts[0]}:${detectedPort}`;
+      }
+      // Use default port if not specified in host
+      return `http://${normalizedHost}:${port}`;
+    }
+
+    // If HOSTED_AT is set, check if request host matches it
+    if (HOSTED_AT) {
+      const hostedUrl = HOSTED_AT.startsWith("http")
+        ? HOSTED_AT
+        : `https://${HOSTED_AT}`;
+      const hostedHost = new URL(hostedUrl).host;
+
+      // Check if request host matches hosted host (exact match or subdomain)
+      if (
+        normalizedHost === hostedHost ||
+        normalizedHost.endsWith(`.${hostedHost}`)
+      ) {
+        return hostedUrl;
+      }
+    }
+
+    // For any other host, construct URL from request host
+    // Use https by default for non-localhost hosts
+    const hasPort = normalizedHost.includes(":");
+    if (hasPort) {
+      return `https://${normalizedHost}`;
+    }
+    // If no port specified, use default HTTPS port (443) for non-localhost
+    return `https://${normalizedHost}`;
+  }
+
+  // Fallback: If HOSTED_AT is set, use it (production)
   if (HOSTED_AT) {
     return HOSTED_AT.startsWith("http") ? HOSTED_AT : `https://${HOSTED_AT}`;
   }
@@ -174,8 +221,9 @@ export const extension: ScratchEndpointDefinition = {
     const { id: extensionId, displayName: extensionName } =
       generateExtensionInfo();
 
-    // Determine the base URL
-    const baseUrl = getBaseUrl();
+    // Determine the base URL from request host
+    const requestHost = context.requestHost;
+    const baseUrl = getBaseUrl(requestHost);
 
     // Create context with user email
     const scratchContext: ScratchContext = { userEmail: email };
