@@ -47,9 +47,10 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
 
   // Accept incoming request ID or generate one
   const reqId =
-    (req.headers?.["x-request-id"] ||
-      req.headers?.["X-Request-Id"] ||
-      "") || randomUUID();
+    req.headers?.["x-request-id"] ||
+    req.headers?.["X-Request-Id"] ||
+    "" ||
+    randomUUID();
 
   // Set response header
   res.setHeader("x-request-id", reqId);
@@ -60,13 +61,11 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
   metadata.startTime = start;
   meta.set(req, { id: reqId, start });
 
-  // Parse URL for logging
+  // Parse URL for logging - use query from context if available (already filtered)
   const url = req.url || "/";
   const urlObj = new URL(url, `http://${req.headers?.host || "localhost"}`);
-  const query: Record<string, string> = {};
-  urlObj.searchParams.forEach((value, key) => {
-    query[key] = value;
-  });
+  const query: Record<string, string> =
+    context.query || Object.fromEntries(urlObj.searchParams);
 
   // Base request log
   log({
@@ -80,8 +79,7 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
     ip: getClientIP(req),
     ua: req.headers?.["user-agent"] || undefined,
     referer: req.headers?.referer || req.headers?.referrer || undefined,
-    req_len:
-      Number(req.headers?.["content-length"] || "") || undefined,
+    req_len: Number(req.headers?.["content-length"] || "") || undefined,
     content_type: req.headers?.["content-type"] || undefined,
   });
 
@@ -150,4 +148,3 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
     throw error;
   }
 };
-

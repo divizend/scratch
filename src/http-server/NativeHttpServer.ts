@@ -52,16 +52,26 @@ export class NativeHttpServer implements HttpServer {
     this.middlewares = createMiddlewareChain(this.staticRoot);
   }
 
+  private filterVercelParams(params: URLSearchParams): Record<string, string> {
+    const query: Record<string, string> = {};
+    params.forEach((value, key) => {
+      if (!key.startsWith("...")) {
+        query[key] = value;
+      }
+    });
+    return query;
+  }
+
   private parseQuery(url: string): Record<string, string> {
     try {
       const urlObj = new URL(url, "http://localhost");
-      return Object.fromEntries(urlObj.searchParams);
+      return this.filterVercelParams(urlObj.searchParams);
     } catch {
       // Fallback for relative URLs
       const queryIndex = url.indexOf("?");
       if (queryIndex < 0) return {};
       const params = new URLSearchParams(url.substring(queryIndex + 1));
-      return Object.fromEntries(params);
+      return this.filterVercelParams(params);
     }
   }
 
@@ -330,7 +340,8 @@ export class NativeHttpServer implements HttpServer {
       const url = new URL(requestUrl);
       const method = request.method;
       const path = url.pathname;
-      const query = Object.fromEntries(url.searchParams);
+      // Use parseQuery to get filtered query params (removes Vercel's ...path parameter)
+      const query = this.parseQuery(url.pathname + url.search);
 
       // Read body if present
       let body: any = null;
