@@ -820,56 +820,68 @@ export class NativeHttpServer implements HttpServer {
         module = await import(absolutePath);
       } else {
         // File doesn't exist, so source is from GitHub - transpile and evaluate with manual import resolution
-        const { getProjectRoot } = await import("../core/ProjectRoot");
-        const projectRoot = await getProjectRoot();
-        const srcIndexPath = resolve(projectRoot, "src", "index.ts");
+        try {
+          // Use relative import to ensure it works regardless of project root location
+          // From src/http-server/NativeHttpServer.ts, ../index resolves to src/index.ts
+          const srcModule = await import("../index");
 
-        // Import the actual source module to provide imports in eval context
-        const srcModule = await import(srcIndexPath);
+          // Replace import statements with variable assignments from provided module
+          let processedSource = source;
 
-        // Replace import statements with variable assignments from provided module
-        let processedSource = source;
+          // Replace: import { X, Y } from "../src"
+          processedSource = processedSource.replace(
+            /import\s+{([^}]+)}\s+from\s+["']\.\.\/src["']/g,
+            (match, imports) => {
+              const importList = imports
+                .split(",")
+                .map((i: string) => i.trim());
+              return importList
+                .map((imp: string) => {
+                  const [name, alias] = imp
+                    .split(" as ")
+                    .map((s: string) => s.trim());
+                  const varName = alias || name;
+                  return `const ${varName} = srcModule.${name};`;
+                })
+                .join("\n");
+            }
+          );
 
-        // Replace: import { X, Y } from "../src"
-        processedSource = processedSource.replace(
-          /import\s+{([^}]+)}\s+from\s+["']\.\.\/src["']/g,
-          (match, imports) => {
-            const importList = imports.split(",").map((i: string) => i.trim());
-            return importList
-              .map((imp: string) => {
-                const [name, alias] = imp
-                  .split(" as ")
-                  .map((s: string) => s.trim());
-                const varName = alias || name;
-                return `const ${varName} = srcModule.${name};`;
-              })
-              .join("\n");
-          }
-        );
+          // Replace: import X from "../src"
+          processedSource = processedSource.replace(
+            /import\s+(\w+)\s+from\s+["']\.\.\/src["']/g,
+            "const $1 = srcModule;"
+          );
 
-        // Replace: import X from "../src"
-        processedSource = processedSource.replace(
-          /import\s+(\w+)\s+from\s+["']\.\.\/src["']/g,
-          "const $1 = srcModule;"
-        );
+          // Transpile TypeScript to JavaScript
+          const transpiler = new Bun.Transpiler({ loader: "ts" });
+          const js = transpiler.transformSync(processedSource);
 
-        // Transpile TypeScript to JavaScript
-        const transpiler = new Bun.Transpiler({ loader: "ts" });
-        const js = transpiler.transformSync(processedSource);
+          // Evaluate with srcModule in scope
+          const wrappedCode = `
+            (function(srcModule) {
+              const exports = {};
+              const module = { exports };
+              ${js}
+              return module.exports;
+            })
+          `;
 
-        // Evaluate with srcModule in scope
-        const wrappedCode = `
-          (function(srcModule) {
-            const exports = {};
-            const module = { exports };
-            ${js}
-            return module.exports;
-          })
-        `;
-
-        const factory = eval(wrappedCode);
-        const exports = factory(srcModule);
-        module = exports;
+          const factory = eval(wrappedCode);
+          const exports = factory(srcModule);
+          module = exports;
+        } catch (evalError) {
+          const errorMessage =
+            evalError instanceof Error ? evalError.message : String(evalError);
+          const errorStack =
+            evalError instanceof Error ? evalError.stack : undefined;
+          console.error(
+            `Failed to evaluate GitHub source for ${filePath}:`,
+            errorMessage,
+            errorStack
+          );
+          throw evalError;
+        }
       }
 
       // Try to find endpoint by filename first
