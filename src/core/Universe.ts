@@ -26,10 +26,8 @@ import { Auth } from "./Auth";
 import { HttpServer } from "../http-server";
 import { NativeHttpServer } from "../http-server/NativeHttpServer";
 import { ScratchContext, ScratchBlock } from "./Scratch";
-import { resolve, join } from "node:path";
-import { cwd } from "node:process";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { resolve, join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { envOrDefault } from "./Env";
 
 /**
@@ -192,9 +190,8 @@ export class Universe {
     universe.httpServer = new NativeHttpServer(universe);
 
     // Get project root for static files
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const projectRoot = resolve(join(__dirname, "..", "..", ".."));
+    const { getProjectRoot } = await import("./ProjectRoot");
+    const projectRoot = await getProjectRoot();
 
     // Register static files
     universe.httpServer.registerStaticFiles(projectRoot);

@@ -820,7 +820,8 @@ export class NativeHttpServer implements HttpServer {
         module = await import(absolutePath);
       } else {
         // File doesn't exist, so source is from GitHub - transpile and evaluate with manual import resolution
-        const projectRoot = process.cwd();
+        const { getProjectRoot } = await import("../core/ProjectRoot");
+        const projectRoot = await getProjectRoot();
         const srcIndexPath = resolve(projectRoot, "src", "index.ts");
 
         // Import the actual source module to provide imports in eval context

@@ -1,7 +1,7 @@
 import { ScratchEndpointDefinition } from "../src";
 import { marked } from "marked";
 import { join } from "node:path";
-import { cwd } from "node:process";
+import { getProjectRoot } from "../src/core/ProjectRoot";
 
 export const root: ScratchEndpointDefinition = {
   block: async () => ({
@@ -12,10 +12,9 @@ export const root: ScratchEndpointDefinition = {
   handler: async (context) => {
     try {
       // Try multiple possible paths for README.md
-      const projectRoot = cwd();
+      const projectRoot = await getProjectRoot();
       const possiblePaths = [
         join(projectRoot, "README.md"),
-        join(process.cwd(), "README.md"),
         "README.md",
       ];
 

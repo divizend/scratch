@@ -10,10 +10,11 @@ import { Universe } from "./src";
 import { setUniverse } from "./src/core";
 import { envOrDefault } from "./src/core/Env";
 import { resolve, join } from "node:path";
-import { cwd } from "node:process";
+import { getProjectRoot } from "./src/core/ProjectRoot";
 
 // Get endpoints directory (defaults to ./endpoints)
-const endpointsDir = resolve(join(cwd(), "endpoints"));
+const projectRoot = await getProjectRoot();
+const endpointsDir = resolve(join(projectRoot, "endpoints"));
 
 // Initialize Universe (this will start the HTTP server automatically)
 // GSuite is enabled by default, so we don't need to specify it

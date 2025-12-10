@@ -8,7 +8,7 @@
 import { Universe } from "../src";
 import { setUniverse } from "../src/core";
 import { resolve, join } from "node:path";
-import { cwd } from "node:process";
+import { getProjectRoot } from "../src/core/ProjectRoot";
 
 // Initialize Universe as a singleton (cached across invocations in Vercel's serverless environment)
 let universe: Universe | null = null;
@@ -20,7 +20,7 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
     return fetchHandler;
   }
 
-  const projectRoot = cwd();
+  const projectRoot = await getProjectRoot();
   const endpointsDir = resolve(join(projectRoot, "endpoints"));
   const { envOrDefault } = await import("../src/core/Env");
   const hostType = envOrDefault(undefined, "HOST_TYPE", "local");
