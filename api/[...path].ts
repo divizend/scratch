@@ -57,16 +57,22 @@ function getHeader(headers: any, name: string): string | null {
  */
 export default async function handler(request: Request): Promise<Response> {
   const handler = await getHandler();
-  
+
   // Ensure request URL is absolute (Vercel may pass relative URLs)
   let requestUrl = request.url;
   if (!requestUrl.startsWith("http://") && !requestUrl.startsWith("https://")) {
     // Construct absolute URL from request headers
-    const host = getHeader(request.headers, "host") || getHeader(request.headers, "Host") || "localhost";
-    const protocol = getHeader(request.headers, "x-forwarded-proto") || 
-                    (host.includes("localhost") ? "http" : "https");
-    requestUrl = `${protocol}://${host}${requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl}`;
-    
+    const host =
+      getHeader(request.headers, "host") ||
+      getHeader(request.headers, "Host") ||
+      "localhost";
+    const protocol =
+      getHeader(request.headers, "x-forwarded-proto") ||
+      (host.includes("localhost") ? "http" : "https");
+    requestUrl = `${protocol}://${host}${
+      requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl
+    }`;
+
     // Create a new Request with the absolute URL
     request = new Request(requestUrl, {
       method: request.method,
@@ -74,6 +80,6 @@ export default async function handler(request: Request): Promise<Response> {
       body: request.body,
     });
   }
-  
+
   return handler(request);
 }
