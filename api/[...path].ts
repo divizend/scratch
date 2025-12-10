@@ -1,6 +1,6 @@
 /**
  * Vercel Serverless Function - Catch-all Route Handler
- * 
+ *
  * This handles all routes by using the Universe's fetch handler.
  * The fetch handler from NativeHttpServer processes all requests.
  */
@@ -38,7 +38,7 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
 
 /**
  * Vercel serverless function handler
- * 
+ *
  * Vercel will call this function for all routes (due to [...path] catch-all).
  * The request URL is already properly formatted by Vercel, so we can pass it directly
  * to the fetch handler from NativeHttpServer.
@@ -48,4 +48,3 @@ export default async function handler(request: Request): Promise<Response> {
   // The request from Vercel already has the correct URL, so we pass it through
   return handler(request);
 }
-
