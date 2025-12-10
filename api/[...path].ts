@@ -20,38 +20,32 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
     return fetchHandler;
   }
 
-  // Get endpoints directory - try multiple possible locations for Vercel
+  // Get endpoints directory - in Vercel, the working directory is /var/task
+  // The endpoints directory should be at the project root
   const projectRoot = cwd();
-  const possibleEndpointsDirs = [
-    resolve(join(projectRoot, "endpoints")),
-    resolve(join(projectRoot, "..", "endpoints")),
-    resolve(join(projectRoot, ".", "endpoints")),
-  ];
+  const endpointsDir = resolve(join(projectRoot, "endpoints"));
 
-  let endpointsDir: string | undefined;
-  for (const dir of possibleEndpointsDirs) {
-    try {
-      const { stat } = await import("node:fs/promises");
-      const stats = await stat(dir);
-      if (stats.isDirectory()) {
-        endpointsDir = dir;
-        break;
-      }
-    } catch {
-      // Continue to next path
-    }
-  }
+  // Minimal logger for initialization
+  const initLog = (record: Record<string, unknown>) => {
+    if (!record.ts) record.ts = new Date().toISOString();
+    console.log(JSON.stringify(record));
+  };
 
-  // Fallback to default if none found
-  if (!endpointsDir) {
-    endpointsDir = resolve(join(projectRoot, "endpoints"));
-  }
+  initLog({
+    level: "info",
+    event: "initializing_universe",
+    projectRoot,
+    endpointsDir,
+  });
 
   // Initialize Universe (this won't start an HTTP server in Vercel/Bun environment)
   universe = await Universe.construct({
     endpointsDirectory: endpointsDir,
   });
   setUniverse(universe);
+
+  const endpointCount = universe.httpServer.getAllEndpoints().length;
+  initLog({ level: "info", event: "universe_initialized", endpointCount });
 
   // Get the fetch handler from NativeHttpServer
   // This is what Vercel needs - it converts Fetch API requests to our internal format

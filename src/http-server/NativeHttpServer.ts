@@ -539,7 +539,16 @@ export class NativeHttpServer implements HttpServer {
       throw new Error(`Expected absolute path, got: ${directoryPath}`);
     }
 
+    log({ level: "info", event: "loading_endpoints", directoryPath });
+
     const filePaths = await this.iterateEndpointFiles(directoryPath);
+    log({
+      level: "info",
+      event: "endpoint_files_found",
+      count: filePaths.length,
+      files: filePaths.map((f) => f.split("/").pop()),
+    });
+
     const loadedEndpoints: ScratchEndpointDefinition[] = [];
 
     for (const filePath of filePaths) {
@@ -553,14 +562,31 @@ export class NativeHttpServer implements HttpServer {
           }
           this.endpoints.set(blockDef.opcode, endpoint);
           loadedEndpoints.push(endpoint);
+          log({
+            level: "info",
+            event: "endpoint_loaded",
+            opcode: blockDef.opcode,
+            file: filePath.split("/").pop(),
+          });
         }
       } catch (error) {
-        console.error(`Failed to load endpoint from ${filePath}:`, error);
+        log({
+          level: "error",
+          event: "endpoint_load_failed",
+          file: filePath.split("/").pop(),
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
     // PUT: Add all loaded endpoints to KV store
     await this.registerEndpoints(loadedEndpoints);
+
+    log({
+      level: "info",
+      event: "endpoints_loaded",
+      total: this.endpoints.size,
+    });
 
     // Mark as initialized
     this.isInitialized = true;
