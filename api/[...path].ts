@@ -40,11 +40,27 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
  * Vercel serverless function handler
  *
  * Vercel will call this function for all routes (due to [...path] catch-all).
- * The request URL is already properly formatted by Vercel, so we can pass it directly
- * to the fetch handler from NativeHttpServer.
+ * We need to ensure the request URL is absolute before passing it to the fetch handler.
  */
 export default async function handler(request: Request): Promise<Response> {
   const handler = await getHandler();
-  // The request from Vercel already has the correct URL, so we pass it through
+  
+  // Ensure request URL is absolute (Vercel may pass relative URLs)
+  let requestUrl = request.url;
+  if (!requestUrl.startsWith("http://") && !requestUrl.startsWith("https://")) {
+    // Construct absolute URL from request headers
+    const host = request.headers.get("host") || request.headers.get("Host") || "localhost";
+    const protocol = request.headers.get("x-forwarded-proto") || 
+                    (host.includes("localhost") ? "http" : "https");
+    requestUrl = `${protocol}://${host}${requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl}`;
+    
+    // Create a new Request with the absolute URL
+    request = new Request(requestUrl, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+    });
+  }
+  
   return handler(request);
 }

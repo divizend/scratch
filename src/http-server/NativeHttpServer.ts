@@ -298,7 +298,16 @@ export class NativeHttpServer implements HttpServer {
   getFetchHandler(): (request: Request) => Promise<Response> {
     // Convert Fetch API Request to Node.js-like request/response
     return async (request: Request): Promise<Response> => {
-      const url = new URL(request.url);
+      // Handle relative URLs (Vercel may pass relative URLs)
+      let requestUrl = request.url;
+      if (!requestUrl.startsWith("http://") && !requestUrl.startsWith("https://")) {
+        // Construct absolute URL from request headers
+        const host = request.headers.get("host") || request.headers.get("Host") || "localhost";
+        const protocol = request.headers.get("x-forwarded-proto") || 
+                        (host.includes("localhost") ? "http" : "https");
+        requestUrl = `${protocol}://${host}${requestUrl.startsWith("/") ? requestUrl : "/" + requestUrl}`;
+      }
+      const url = new URL(requestUrl);
       const method = request.method;
       const path = url.pathname;
       const query = Object.fromEntries(url.searchParams);
