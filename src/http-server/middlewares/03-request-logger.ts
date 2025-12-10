@@ -9,9 +9,13 @@ import { Middleware, MiddlewareContext } from "./types";
 // Keep per-request metadata without leaking memory
 const meta = new WeakMap<any, { id: string; start: number }>();
 
-// Minimal structured logger
-const log = (record: Record<string, unknown>) =>
+// Minimal structured logger - automatically adds timestamp unless explicitly provided
+const log = (record: Record<string, unknown>) => {
+  if (!record.ts) {
+    record.ts = new Date().toISOString();
+  }
   console.log(JSON.stringify(record));
+};
 
 // Best-effort client IP from common proxy/CDN headers
 const getClientIP = (req: any): string | undefined => {
@@ -69,7 +73,6 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
 
   // Base request log
   log({
-    ts: new Date().toISOString(),
     level: "info",
     event: "request",
     req_id: reqId,
@@ -84,7 +87,6 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
   });
 
   log({
-    ts: new Date().toISOString(),
     level: "info",
     event: "after_request_log",
     req_id: reqId,
@@ -123,7 +125,6 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
     const duration = m ? Math.round(performance.now() - m.start) : undefined;
 
     log({
-      ts: new Date().toISOString(),
       level: "info",
       event: "response",
       req_id: reqId,
@@ -143,7 +144,6 @@ export const requestLoggerMiddleware: Middleware = async (ctx, next) => {
     );
 
     log({
-      ts: new Date().toISOString(),
       level: "error",
       event: "error",
       req_id: reqIdForError,

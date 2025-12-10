@@ -32,9 +32,13 @@ import {
   Middleware,
 } from "./middlewares";
 
-// Minimal structured logger
-const log = (record: Record<string, unknown>) =>
+// Minimal structured logger - automatically adds timestamp unless explicitly provided
+const log = (record: Record<string, unknown>) => {
+  if (!record.ts) {
+    record.ts = new Date().toISOString();
+  }
   console.log(JSON.stringify(record));
+};
 
 export class NativeHttpServer implements HttpServer {
   private server: Server | null = null;
@@ -97,7 +101,6 @@ export class NativeHttpServer implements HttpServer {
     if (index >= this.middlewares.length) {
       // All middlewares executed, now handle routing
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "middleware_chain_complete",
         req_id: ctx.metadata.requestId,
@@ -134,7 +137,6 @@ export class NativeHttpServer implements HttpServer {
     const path = context.path || "";
 
     log({
-      ts: new Date().toISOString(),
       level: "info",
       event: "handle_routing_start",
       req_id: ctx.metadata.requestId,
@@ -153,7 +155,6 @@ export class NativeHttpServer implements HttpServer {
     }
 
     log({
-      ts: new Date().toISOString(),
       level: "info",
       event: "opcode_extracted",
       req_id: ctx.metadata.requestId,
@@ -165,7 +166,6 @@ export class NativeHttpServer implements HttpServer {
 
     if (!endpoint) {
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "endpoint_not_found",
         req_id: ctx.metadata.requestId,
@@ -178,7 +178,6 @@ export class NativeHttpServer implements HttpServer {
     }
 
     log({
-      ts: new Date().toISOString(),
       level: "info",
       event: "endpoint_found",
       req_id: ctx.metadata.requestId,
@@ -206,7 +205,6 @@ export class NativeHttpServer implements HttpServer {
 
     try {
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "building_handler",
         req_id: ctx.metadata.requestId,
@@ -220,7 +218,6 @@ export class NativeHttpServer implements HttpServer {
         requiredModules: endpoint.requiredModules || [],
       });
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "handler_built",
         req_id: ctx.metadata.requestId,
@@ -241,7 +238,6 @@ export class NativeHttpServer implements HttpServer {
       };
 
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "executing_handler",
         req_id: ctx.metadata.requestId,
@@ -255,7 +251,6 @@ export class NativeHttpServer implements HttpServer {
         authHeader
       );
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "handler_completed",
         req_id: ctx.metadata.requestId,
@@ -266,7 +261,6 @@ export class NativeHttpServer implements HttpServer {
       // Handle the result
       handleHandlerResult(result, res);
       log({
-        ts: new Date().toISOString(),
         level: "info",
         event: "response_sent",
         req_id: ctx.metadata.requestId,
@@ -288,7 +282,6 @@ export class NativeHttpServer implements HttpServer {
           : 500;
 
       log({
-        ts: new Date().toISOString(),
         level: "error",
         event: "handler_error",
         req_id: ctx.metadata.requestId,

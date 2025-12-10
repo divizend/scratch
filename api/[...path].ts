@@ -20,8 +20,32 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
     return fetchHandler;
   }
 
-  // Get endpoints directory
-  const endpointsDir = resolve(join(cwd(), "endpoints"));
+  // Get endpoints directory - try multiple possible locations for Vercel
+  const projectRoot = cwd();
+  const possibleEndpointsDirs = [
+    resolve(join(projectRoot, "endpoints")),
+    resolve(join(projectRoot, "..", "endpoints")),
+    resolve(join(projectRoot, ".", "endpoints")),
+  ];
+
+  let endpointsDir: string | undefined;
+  for (const dir of possibleEndpointsDirs) {
+    try {
+      const { stat } = await import("node:fs/promises");
+      const stats = await stat(dir);
+      if (stats.isDirectory()) {
+        endpointsDir = dir;
+        break;
+      }
+    } catch {
+      // Continue to next path
+    }
+  }
+
+  // Fallback to default if none found
+  if (!endpointsDir) {
+    endpointsDir = resolve(join(projectRoot, "endpoints"));
+  }
 
   // Initialize Universe (this won't start an HTTP server in Vercel/Bun environment)
   universe = await Universe.construct({
