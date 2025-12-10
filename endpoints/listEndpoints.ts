@@ -13,14 +13,16 @@ export const listEndpoints: ScratchEndpointDefinition = {
     const resolvedEndpoints = await Promise.all(
       endpointDefinitions.map(async (epDef) => {
         const blockDef = await epDef.block(context);
+        if (!blockDef.opcode || blockDef.opcode === "") {
+          throw new Error("Endpoint opcode cannot be empty");
+        }
         const method = blockDef.blockType === "reporter" ? "GET" : "POST";
-        // Handle root endpoint (empty opcode maps to "/")
-        const endpoint = blockDef.opcode === "" ? "/" : `/${blockDef.opcode}`;
+        const endpoint = `/${blockDef.opcode}`;
 
         return {
           method,
           path: endpoint,
-          opcode: blockDef.opcode || "",
+          opcode: blockDef.opcode,
           blockType: blockDef.blockType,
           text: blockDef.text,
           schema: blockDef.schema,

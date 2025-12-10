@@ -19,7 +19,7 @@ export const getDocAsPlainText: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { documentId } = context.validatedBody!;
+    const { documentId } = context.inputs!;
     const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
     const doc = await openDocument(gsuiteUser, documentId);
     return doc.toPlainText();

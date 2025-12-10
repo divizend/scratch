@@ -24,7 +24,7 @@ export const listGmailMessages: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { label, limit, userEmail } = context.validatedBody!;
+    const { label, limit, userEmail } = context.inputs!;
     const email = userEmail;
 
     try {

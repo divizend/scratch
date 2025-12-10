@@ -29,7 +29,7 @@ export const queueEmail: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { from, to, subject, content } = context.validatedBody!;
+    const { from, to, subject, content } = context.inputs!;
 
     // Extract domain from "from" email address
     const fromDomain = from.split("@")[1];

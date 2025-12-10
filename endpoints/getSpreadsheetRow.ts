@@ -24,7 +24,7 @@ export const getSpreadsheetRow: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { row, spreadsheetId } = context.validatedBody!;
+    const { row, spreadsheetId } = context.inputs!;
     const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
     const { spreadsheet, sheet, spreadsheets } =
       await openSpreadsheetFirstSheet(gsuiteUser, spreadsheetId);

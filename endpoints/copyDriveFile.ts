@@ -28,7 +28,7 @@ export const copyDriveFile: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { sourceFileId, destFolderId, name } = context.validatedBody!;
+    const { sourceFileId, destFolderId, name } = context.inputs!;
 
     try {
       // Extract file IDs from URLs if needed

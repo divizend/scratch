@@ -14,7 +14,7 @@ export const sendJwt: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { email } = context.validatedBody!;
+    const { email } = context.inputs!;
 
     // Validate email domain
     const orgConfigs = (context.universe!.gsuite as any).orgConfigs;

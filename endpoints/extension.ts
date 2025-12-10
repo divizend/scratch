@@ -19,28 +19,18 @@ function generateExtensionInfo() {
   };
 }
 
-// Determine the base URL for the extension based on whether we're running locally
-function getBaseUrl(c: any): string {
-  const host = c.req.header("host") || "";
+// Determine the base URL for the extension
+function getBaseUrl(): string {
+  const HOSTED_AT = envOrDefault(undefined, "HOSTED_AT", "");
   const port = envOrDefault(undefined, "PORT", "3000");
-  const isLocal =
-    host.includes("localhost") ||
-    host.includes("127.0.0.1") ||
-    host.includes("::1") ||
-    host.startsWith("127.") ||
-    host.startsWith("192.168.") ||
-    host.startsWith("10.");
 
-  if (isLocal) {
-    return `http://localhost:${port}`;
+  // If HOSTED_AT is set, use it (production)
+  if (HOSTED_AT) {
+    return HOSTED_AT.startsWith("http") ? HOSTED_AT : `https://${HOSTED_AT}`;
   }
 
-  const HOSTED_AT = envOrDefault(undefined, "HOSTED_AT", "scratch.divizend.ai");
-  // Use HOSTED_AT, ensuring it has a protocol
-  const hostedAt = HOSTED_AT.startsWith("http")
-    ? HOSTED_AT
-    : `https://${HOSTED_AT}`;
-  return hostedAt;
+  // Otherwise, assume local development
+  return `http://localhost:${port}`;
 }
 
 // Helper function to generate default value from JSON schema
@@ -152,8 +142,8 @@ export const extension: ScratchEndpointDefinition = {
       });
     }
 
-    // Get JWT from query parameter (since this is a GET request)
-    const jwtToken = (context as any).query?.jwt || "";
+    // Get JWT from inputs (query params for GET requests go into inputs)
+    const jwtToken = context.inputs?.jwt || "";
 
     if (!jwtToken) {
       return new Response("JWT token required. Use ?jwt=...", {
@@ -184,21 +174,23 @@ export const extension: ScratchEndpointDefinition = {
     const { id: extensionId, displayName: extensionName } =
       generateExtensionInfo();
 
-    // Determine the base URL from the request context
-    const baseUrl = getBaseUrl((context as any).c);
+    // Determine the base URL
+    const baseUrl = getBaseUrl();
 
     // Create context with user email
     const scratchContext: ScratchContext = { userEmail: email };
 
     // Generate the Scratch extension class
-    const scratchEndpoints =
-      (universe.httpServer as any).getRegisteredScratchEndpoints() || [];
+    const endpoints = universe.httpServer.getAllEndpoints();
     const resolvedEndpoints = await Promise.all(
-      scratchEndpoints.map(async (ep) => {
-        const block = await ep.block(scratchContext);
-        // Ensure opcode is never empty - use "root" for root endpoint
-        const opcode = block.opcode === "" ? "root" : block.opcode;
-        return { ...ep, block: { ...block, opcode } };
+      endpoints.map(async (endpoint) => {
+        const block = await endpoint.block(scratchContext);
+        if (!block.opcode || block.opcode === "") {
+          throw new Error("Endpoint opcode cannot be empty");
+        }
+        const opcode = block.opcode;
+        const endpointPath = `/${opcode}`;
+        return { endpoint, block, endpointPath };
       })
     );
 
@@ -226,7 +218,7 @@ export const extension: ScratchEndpointDefinition = {
                 `"${idx === 0 ? "?" : "&"}${p}=" + encodeURIComponent(${p})`
             );
             fetchCode = `    return fetch("${baseUrl}${
-              ep.endpoint
+              ep.endpointPath
             }" + ${queryParts.join(" + ")}, {
       method: "GET",
       headers: {
@@ -234,7 +226,7 @@ export const extension: ScratchEndpointDefinition = {
       }
     }).then((response) => response.text());`;
           } else {
-            fetchCode = `    return fetch("${baseUrl}${ep.endpoint}", {
+            fetchCode = `    return fetch("${baseUrl}${ep.endpointPath}", {
       method: "GET",
       headers: {
         "Authorization": "Bearer ${jwtToken}",
@@ -248,7 +240,7 @@ export const extension: ScratchEndpointDefinition = {
                   .map((p) => `${p}`)
                   .join(", ")} })`
               : "";
-          fetchCode = `    return fetch("${baseUrl}${ep.endpoint}", {
+          fetchCode = `    return fetch("${baseUrl}${ep.endpointPath}", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

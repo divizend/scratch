@@ -23,8 +23,8 @@ import {
   S2,
 } from "..";
 import { Auth } from "./Auth";
-import { HttpServer } from "./http-server";
-import { HonoHttpServer } from "./http-server/HonoHttpServer";
+import { HttpServer } from "../http-server";
+import { NativeHttpServer } from "../http-server/NativeHttpServer";
 import { resolve, join } from "node:path";
 import { cwd } from "node:process";
 import { fileURLToPath } from "url";
@@ -188,7 +188,7 @@ export class Universe {
     universe.emailQueue = new EmailQueue(profiles);
 
     // Initialize HTTP server
-    universe.httpServer = new HonoHttpServer(universe);
+    universe.httpServer = new NativeHttpServer(universe);
 
     // Get project root for static files
     const __filename = fileURLToPath(import.meta.url);
@@ -220,9 +220,11 @@ export class Universe {
       console.log(`Total: ${endpointInfos.length} endpoints\n`);
     }
 
-    // Start the server
-    const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
-    await universe.httpServer.start(port);
+    // Start the server (skip if running in Bun, as Bun handles server lifecycle)
+    if (typeof Bun === "undefined") {
+      const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
+      await universe.httpServer.start(port);
+    }
 
     return universe;
   }

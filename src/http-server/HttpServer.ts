@@ -2,11 +2,10 @@
  * HttpServer - Abstract HTTP server interface
  *
  * This interface defines the contract for HTTP server implementations.
- * Currently, only Hono is implemented, but this abstraction allows for
- * future implementations (Express, Fastify, etc.)
+ * Currently, only NativeHttpServer is implemented using Node's native http module.
  */
 
-import { ScratchEndpointDefinition } from "../Scratch";
+import { ScratchEndpointDefinition } from "../core/Scratch";
 
 export interface HttpServer {
   /**
@@ -77,4 +76,16 @@ export interface HttpServer {
   getHandler(
     opcode: string
   ): Promise<((context: any) => Promise<any>) | undefined>;
+
+  /**
+   * Register an endpoint from TypeScript source code
+   * @param source - TypeScript source code for the endpoint
+   * @returns Promise that resolves with registration result
+   */
+  registerEndpoint(source: string): Promise<{
+    success: boolean;
+    opcode?: string;
+    message?: string;
+    error?: string;
+  }>;
 }

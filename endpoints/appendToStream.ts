@@ -32,7 +32,7 @@ export const appendToStream: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { streamName, data } = context.validatedBody!;
+    const { streamName, data } = context.inputs!;
     const basinName = S2.getBasin();
     await context.universe!.s2!.appendToStream(basinName, streamName, data);
     return {

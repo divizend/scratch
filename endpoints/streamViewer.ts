@@ -14,10 +14,7 @@ export const streamViewer: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const streamName =
-      context.validatedBody?.streamName ||
-      (context as any).query?.streamName ||
-      "scratch-demo";
+    const streamName = context.inputs?.streamName || "scratch-demo";
 
     // Generate complete HTML with inline JavaScript
     const html = `<!DOCTYPE html>

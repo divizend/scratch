@@ -19,7 +19,7 @@ export const readFromStreamRaw: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { streamName, limit } = context.validatedBody!;
+    const { streamName, limit } = context.inputs!;
     const basinName = S2.getBasin();
     const limitNum = parseInt(limit || "10", 10) || 10;
     const result = await context.universe!.s2!.readFromStreamRaw(

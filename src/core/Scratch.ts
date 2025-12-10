@@ -28,17 +28,8 @@ export interface ScratchBlock {
 
 export interface ScratchContext {
   userEmail?: string;
-  validatedBody?: any; // Validated request body (set after validation middleware)
+  inputs?: any; // Validated request body/query params (set after validation)
   universe?: Universe | null; // Universe instance (set by context middleware)
-  c?: any; // Hono context for access to request/response
-  query?: any; // Query parameters
-}
-
-export interface ScratchEndpoint {
-  opcode: string;
-  block: (context: ScratchContext) => Promise<ScratchBlock>;
-  endpoint: string;
-  noAuth?: boolean;
 }
 
 export interface ScratchEndpointDefinition {

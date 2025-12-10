@@ -17,7 +17,7 @@ export const markdownToHTML: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { markdown } = context.validatedBody!;
+    const { markdown } = context.inputs!;
     // Parse JSON-stringified markdown first
     let markdownText: string;
     try {

@@ -24,7 +24,7 @@ export const getArrayLength: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { array } = context.validatedBody!;
+    const { array } = context.inputs!;
     // array is already parsed and validated as an array by the middleware
     return String(array.length);
   },

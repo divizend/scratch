@@ -27,7 +27,7 @@ export const extractWithJSONPath: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { json, path } = context.validatedBody!;
+    const { json, path } = context.inputs!;
     // json is already parsed and validated by the middleware
     const results = JSONPath({ path, json });
 

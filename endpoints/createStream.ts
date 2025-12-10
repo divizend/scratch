@@ -14,7 +14,7 @@ export const createStream: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { streamName } = context.validatedBody!;
+    const { streamName } = context.inputs!;
     const basinName = S2.getBasin();
     const result = await context.universe!.s2!.createStream(
       basinName,

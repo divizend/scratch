@@ -14,7 +14,7 @@ export const getGmailLabels: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { userEmail } = context.validatedBody!;
+    const { userEmail } = context.inputs!;
     const email = userEmail;
 
     try {

@@ -18,7 +18,7 @@ export const removeEmails: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { ids } = context.validatedBody!;
+    const { ids } = context.inputs!;
     // ids is already parsed and validated as a non-empty array by the middleware
     const removed = context.universe!.emailQueue.removeByIds(ids);
     return {

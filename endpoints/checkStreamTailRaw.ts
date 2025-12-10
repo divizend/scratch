@@ -19,7 +19,7 @@ export const checkStreamTailRaw: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { streamName, limit } = context.validatedBody!;
+    const { streamName, limit } = context.inputs!;
     const basinName = S2.getBasin();
     const limitNum = parseInt(limit || "5", 10) || 5;
     try {

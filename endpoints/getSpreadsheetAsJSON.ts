@@ -19,7 +19,7 @@ export const getSpreadsheetAsJSON: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { spreadsheetId } = context.validatedBody!;
+    const { spreadsheetId } = context.inputs!;
     const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
     const { spreadsheet, sheet, spreadsheets } =
       await openSpreadsheetFirstSheet(gsuiteUser, spreadsheetId);

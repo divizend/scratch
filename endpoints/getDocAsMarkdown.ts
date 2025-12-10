@@ -19,7 +19,7 @@ export const getDocAsMarkdown: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { documentId } = context.validatedBody!;
+    const { documentId } = context.inputs!;
     const gsuiteUser = context.universe!.gsuite.user(context.userEmail!);
     const doc = await openDocument(gsuiteUser, documentId);
     const markdown = await doc.toMarkdown();

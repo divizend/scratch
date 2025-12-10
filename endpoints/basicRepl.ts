@@ -1,4 +1,5 @@
 import { ScratchEndpointDefinition } from "../src";
+import { DEFAULT_BASIC_DEMO } from "../src/basic/demo";
 
 export const basicRepl: ScratchEndpointDefinition = {
   block: async () => ({
@@ -7,6 +8,11 @@ export const basicRepl: ScratchEndpointDefinition = {
     text: "BASIC REPL",
   }),
   handler: async (context) => {
+    // Escape the default code for HTML
+    const defaultCodeEscaped = DEFAULT_BASIC_DEMO.replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -92,19 +98,7 @@ export const basicRepl: ScratchEndpointDefinition = {
 
       <div class="code-section">
         <label for="basicCode">BASIC Code:</label>
-        <textarea id="basicCode" placeholder="# Enter your BASIC code here
-x = 0
-while x < 5
-  call appendToStream &quot;test&quot; {&quot;count&quot;: x}
-  x = x + 1
-end
-return x"># Simple example
-x = 0
-while x < 5
-  call appendToStream "test" {"count": x}
-  x = x + 1
-end
-return x</textarea>
+        <textarea id="basicCode" placeholder="# Enter your BASIC code here (first line is the text)">${defaultCodeEscaped}</textarea>
       </div>
 
       <div class="actions">

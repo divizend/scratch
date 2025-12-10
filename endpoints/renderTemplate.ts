@@ -31,7 +31,7 @@ export const renderTemplate: ScratchEndpointDefinition = {
     },
   }),
   handler: async (context) => {
-    const { template, data } = context.validatedBody!;
+    const { template, data } = context.inputs!;
     // data is already parsed and validated by the middleware
 
     // Recursively convert "TRUE" to true and "FALSE" to false
