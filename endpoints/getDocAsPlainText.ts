@@ -2,7 +2,7 @@ import {
   ScratchEndpointDefinition,
   UniverseModule,
   openDocument,
-} from "../src";
+} from "@divizend/scratch-core";
 
 export const getDocAsPlainText: ScratchEndpointDefinition = {
   block: async (context) => ({

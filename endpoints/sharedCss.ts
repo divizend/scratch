@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition } from "../src";
+import { ScratchEndpointDefinition } from "@divizend/scratch-core";
 
 export const sharedCss: ScratchEndpointDefinition = {
   block: async () => ({

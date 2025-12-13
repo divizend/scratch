@@ -8,7 +8,7 @@
  * @version 1.0.0
  */
 
-import { envOr, envOrDefault } from "../core/Env";
+import { envOr, envOrDefault } from "../index";
 
 export interface ResendEmailParams {
   from: string;

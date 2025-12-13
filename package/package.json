@@ -1,14 +1,19 @@
 {
-  "name": "@divizend/scratch",
+  "name": "@divizend/scratch-core",
   "version": "1.0.0",
-  "scripts": {
-    "dev": "bun run server.ts",
-    "start": "bun run server.ts",
-    "build": "tsc --noEmit"
-  },
+  "description": "Core library for Scratch endpoint system",
+  "main": "index.ts",
   "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "files": [
+    "**/*.ts"
+  ],
+  "scripts": {
+    "prepublishOnly": "echo 'Publishing @divizend/scratch-core'"
+  },
   "dependencies": {
-    "@divizend/scratch-core": "file:./package",
     "@s2-dev/streamstore": "^0.18.1",
     "cloudevents": "^10.0.0",
     "google-auth-library": "^10.5.0",
@@ -25,5 +30,8 @@
     "@types/node": "^24.10.1",
     "@types/turndown": "^5.0.6",
     "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

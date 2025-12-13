@@ -5,10 +5,8 @@
  * The fetch handler from NativeHttpServer processes all requests.
  */
 
-import { Universe } from "../src";
-import { setUniverse } from "../src/core";
+import { Universe, setUniverse, getProjectRoot } from "@divizend/scratch-core";
 import { resolve, join } from "node:path";
-import { getProjectRoot } from "../src/core/ProjectRoot";
 
 // Initialize Universe as a singleton (cached across invocations in Vercel's serverless environment)
 let universe: Universe | null = null;
@@ -22,8 +20,9 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
 
   const projectRoot = await getProjectRoot();
   const endpointsDir = resolve(join(projectRoot, "endpoints"));
-  const { envOrDefault } = await import("../src/core/Env");
+  const { envOrDefault } = await import("@divizend/scratch-core");
   const hostType = envOrDefault(undefined, "HOST_TYPE", "local");
+  const githubUrl = process.env.ENDPOINTS_GITHUB_URL;
 
   const initLog = (record: Record<string, unknown>) => {
     if (!record.ts) record.ts = new Date().toISOString();
@@ -36,8 +35,7 @@ async function getHandler(): Promise<(request: Request) => Promise<Response>> {
     projectRoot,
     endpointsDir,
     hostType,
-    githubUrl:
-      hostType === "production" ? process.env.ENDPOINTS_GITHUB_URL : undefined,
+    githubUrl: githubUrl || undefined,
   });
 
   // Initialize Universe (this won't start an HTTP server in Vercel/Bun environment)

@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition } from "../src";
+import { ScratchEndpointDefinition } from "@divizend/scratch-core";
 import { marked } from "marked";
 
 export const markdownToHTML: ScratchEndpointDefinition = {

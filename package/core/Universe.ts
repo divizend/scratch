@@ -220,8 +220,8 @@ export class Universe {
 
     // Start the server (skip if running in Bun, as Bun handles server lifecycle)
     if (typeof Bun === "undefined") {
-      const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
-      await universe.httpServer.start(port);
+    const port = parseInt(envOrDefault(undefined, "PORT", "3000"), 10);
+    await universe.httpServer.start(port);
     }
 
     return universe;

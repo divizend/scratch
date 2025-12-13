@@ -1,7 +1,6 @@
-import { ScratchEndpointDefinition } from "../src";
+import { ScratchEndpointDefinition, getProjectRoot } from "@divizend/scratch-core";
 import { marked } from "marked";
 import { join } from "node:path";
-import { getProjectRoot } from "../src/core/ProjectRoot";
 
 export const root: ScratchEndpointDefinition = {
   block: async () => ({

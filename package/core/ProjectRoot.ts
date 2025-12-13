@@ -28,7 +28,16 @@ export async function getProjectRoot(): Promise<string> {
   const __dirname = dirname(__filename);
 
   // Start from the current file's directory and walk up
+  // If we're in node_modules, walk up to the actual project root
   let currentDir = resolve(__dirname);
+  
+  // If we're in node_modules/@divizend/scratch-core, walk up to the workspace root
+  if (currentDir.includes("node_modules/@divizend/scratch-core")) {
+    // Walk up from node_modules/@divizend/scratch-core to the workspace root
+    while (currentDir.includes("node_modules") && currentDir !== dirname(currentDir)) {
+      currentDir = dirname(currentDir);
+    }
+  }
 
   // Marker files that indicate project root
   const markers = ["package.json", "tsconfig.json"];

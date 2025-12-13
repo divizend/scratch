@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition } from "../src";
+import { ScratchEndpointDefinition } from "@divizend/scratch-core";
 
 export const registerEndpoint: ScratchEndpointDefinition = {
   block: async () => ({
@@ -8,7 +8,7 @@ export const registerEndpoint: ScratchEndpointDefinition = {
     schema: {
       source: {
         type: "string",
-        default: `import { ScratchEndpointDefinition } from "../src";
+        default: `import { ScratchEndpointDefinition } from "@divizend/scratch-core";
 
 export const myEndpoint: ScratchEndpointDefinition = {
   block: async () => ({

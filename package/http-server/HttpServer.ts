@@ -5,7 +5,7 @@
  * Currently, only NativeHttpServer is implemented using Node's native http module.
  */
 
-import { ScratchEndpointDefinition, ScratchContext } from "../core/Scratch";
+import { ScratchEndpointDefinition, ScratchContext } from "../index";
 
 export interface HttpServer {
   /**

@@ -2,7 +2,7 @@ import {
   ScratchEndpointDefinition,
   UniverseModule,
   openSpreadsheetFirstSheet,
-} from "../src";
+} from "@divizend/scratch-core";
 
 export const getSpreadsheetColumn: ScratchEndpointDefinition = {
   block: async (context) => ({

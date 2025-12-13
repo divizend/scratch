@@ -389,7 +389,7 @@ class TypeScriptGenerator {
     return `/**
 ${basicCodeComment}
  */
-import { ScratchEndpointDefinition } from "../src";
+import type { ScratchEndpointDefinition } from "../index";
 
 export const ${opcode}: ScratchEndpointDefinition = {
   block: async () => ({

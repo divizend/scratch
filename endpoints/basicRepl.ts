@@ -1,5 +1,4 @@
-import { ScratchEndpointDefinition } from "../src";
-import { DEFAULT_BASIC_DEMO } from "../src/basic/demo";
+import { ScratchEndpointDefinition, DEFAULT_BASIC_DEMO } from "@divizend/scratch-core";
 
 export const basicRepl: ScratchEndpointDefinition = {
   block: async () => ({

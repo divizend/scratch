@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition, UniverseModule } from "../src/core";
+import { ScratchEndpointDefinition, UniverseModule } from "@divizend/scratch-core";
 
 export const getUsers: ScratchEndpointDefinition = {
   block: async (context) => ({

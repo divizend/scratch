@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition, UniverseModule, getUniverse } from "../src";
+import { ScratchEndpointDefinition, UniverseModule, getUniverse } from "@divizend/scratch-core";
 
 export const sendJwt: ScratchEndpointDefinition = {
   block: async (context) => ({

@@ -4,7 +4,7 @@ import {
   ScratchBlock,
   getUniverse,
   envOrDefault,
-} from "../src";
+} from "@divizend/scratch-core";
 
 // Extension helper functions (moved from extension.ts)
 
@@ -40,7 +40,7 @@ function getBaseUrl(requestHost?: string): string {
       if (hostParts.length > 1) {
         const detectedPort = hostParts[hostParts.length - 1];
         return `http://${hostParts[0]}:${detectedPort}`;
-      }
+  }
       // Use default port if not specified in host
       return `http://${normalizedHost}:${port}`;
     }
@@ -48,8 +48,8 @@ function getBaseUrl(requestHost?: string): string {
     // If HOSTED_AT is set, check if request host matches it
     if (HOSTED_AT) {
       const hostedUrl = HOSTED_AT.startsWith("http")
-        ? HOSTED_AT
-        : `https://${HOSTED_AT}`;
+    ? HOSTED_AT
+    : `https://${HOSTED_AT}`;
       const hostedHost = new URL(hostedUrl).host;
 
       // Check if request host matches hosted host (exact match or subdomain)

@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition, UniverseModule, S2 } from "../src";
+import { ScratchEndpointDefinition, UniverseModule, S2 } from "@divizend/scratch-core";
 
 export const checkStreamTailRaw: ScratchEndpointDefinition = {
   block: async (context) => ({

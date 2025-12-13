@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition, UniverseModule } from "../src/core";
+import { ScratchEndpointDefinition, UniverseModule } from "@divizend/scratch-core";
 
 export const sendSelectedEmails: ScratchEndpointDefinition = {
   block: async (context) => ({

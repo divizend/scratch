@@ -102,3 +102,4 @@ GCP_ADMIN_USER_DIVIZEND=your.name@divizend.com
 ## Todo
 
 - add an interpreter for a new BASIC-like programming language which can be called like any other endpoint and which does endpoint calls as well as jumps and handling variables (goal: have a set of atomic core functionality, i.e. the main blocks, and then expressing all more high-level functionality in terms of those)
+- add an endpoint which, given simply a target string, returns the SVG or PNG of the corresponding QR code

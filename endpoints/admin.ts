@@ -1,4 +1,4 @@
-import { ScratchEndpointDefinition } from "../src";
+import { ScratchEndpointDefinition } from "@divizend/scratch-core";
 
 export const admin: ScratchEndpointDefinition = {
   block: async () => ({
@@ -7,7 +7,7 @@ export const admin: ScratchEndpointDefinition = {
     text: "admin interface",
   }),
   handler: async (context) => {
-      const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
@@ -527,10 +527,10 @@ export const admin: ScratchEndpointDefinition = {
 </body>
 </html>`;
 
-      return new Response(html, {
-        status: 200,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   },
   noAuth: true,
 };

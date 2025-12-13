@@ -2,7 +2,7 @@ import {
   ScratchEndpointDefinition,
   UniverseModule,
   extractFileId,
-} from "../src";
+} from "@divizend/scratch-core";
 
 export const copyDriveFile: ScratchEndpointDefinition = {
   block: async (context) => ({

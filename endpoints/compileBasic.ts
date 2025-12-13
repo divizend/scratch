@@ -1,6 +1,4 @@
-import { ScratchEndpointDefinition } from "../src";
-import { compileBasicToTypeScript } from "../src/basic";
-import { DEFAULT_BASIC_DEMO } from "../src/basic/demo";
+import { ScratchEndpointDefinition, compileBasicToTypeScript, DEFAULT_BASIC_DEMO } from "@divizend/scratch-core";
 
 export const compileBasic: ScratchEndpointDefinition = {
   block: async () => ({

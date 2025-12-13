@@ -25,4 +25,3 @@ export * from "./Currency";
 export * from "./JsonSchemaValidator";
 export * from "./Env";
 export * from "./ProjectRoot";
-export * from "../http-server";

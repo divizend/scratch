@@ -12,7 +12,7 @@
 
 import { S2 as S2Client, AppendRecord } from "@s2-dev/streamstore";
 import { CloudEvent } from "cloudevents";
-import { envOr, env, envOrDefault } from "../core/Env";
+import { envOr, env, envOrDefault } from "../index";
 
 export interface S2ReadResult {
   records: any[];

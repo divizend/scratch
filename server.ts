@@ -6,11 +6,28 @@
  * when this module is imported.
  */
 
-import { Universe } from "./src";
-import { setUniverse } from "./src/core";
-import { envOrDefault } from "./src/core/Env";
 import { resolve, join } from "node:path";
-import { getProjectRoot } from "./src/core/ProjectRoot";
+
+console.log("[server.ts] Starting server.ts");
+console.log("[server.ts] import.meta.url:", import.meta.url);
+
+console.log("[server.ts] Attempting to import from @divizend/scratch-core");
+console.log("[server.ts] Resolving @divizend/scratch-core...");
+try {
+  const resolved = await import.meta.resolve("@divizend/scratch-core");
+  console.log("[server.ts] Resolved path:", resolved);
+} catch (e) {
+  console.error("[server.ts] Error resolving:", e);
+}
+const scratchCore = await import("@divizend/scratch-core");
+console.log("[server.ts] @divizend/scratch-core module keys:", Object.keys(scratchCore));
+console.log("[server.ts] Universe exists:", "Universe" in scratchCore);
+console.log("[server.ts] setUniverse exists:", "setUniverse" in scratchCore);
+console.log("[server.ts] envOrDefault exists:", "envOrDefault" in scratchCore);
+console.log("[server.ts] getProjectRoot exists:", "getProjectRoot" in scratchCore);
+console.log("[server.ts] S2 exists:", "S2" in scratchCore);
+
+const { Universe, setUniverse, envOrDefault, getProjectRoot } = scratchCore;
 
 // Get endpoints directory (defaults to ./endpoints)
 const projectRoot = await getProjectRoot();

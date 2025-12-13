@@ -18,12 +18,10 @@ import { randomUUID } from "node:crypto";
 import { HttpServer } from "./HttpServer";
 import {
   Universe,
-  UniverseModule,
-  ScratchBlock,
   ScratchContext,
   ScratchEndpointDefinition,
-} from "../core/index";
-import { envOrDefault } from "../core/Env";
+  envOrDefault,
+} from "../index";
 import {
   createMiddlewareChain,
   wrapHandlerWithAuthAndValidation,
@@ -535,10 +533,23 @@ export class NativeHttpServer implements HttpServer {
 
   // Endpoint management methods
   async loadEndpointsFromDirectory(directoryPath: string): Promise<void> {
-    const hostType = envOrDefault(undefined, "HOST_TYPE", "local");
-    const githubUrl = process.env.ENDPOINTS_GITHUB_URL;
+    // Try to get GitHub URL from environment using envOrDefault (which handles .env loading)
+    const githubUrl = envOrDefault(
+      undefined,
+      "ENDPOINTS_GITHUB_URL",
+      undefined
+    );
 
-    if (hostType === "production" && githubUrl) {
+    log({
+      level: "info",
+      event: "checking_endpoint_source",
+      githubUrl: githubUrl || "not set",
+      directoryPath,
+      rawEnv: process.env.ENDPOINTS_GITHUB_URL || "not in process.env",
+    });
+
+    // Always load from GitHub if ENDPOINTS_GITHUB_URL is set (default behavior)
+    if (githubUrl && githubUrl !== "undefined") {
       log({ level: "info", event: "loading_endpoints_from_github", githubUrl });
       await this.loadEndpointsFromGitHub(githubUrl);
       return;

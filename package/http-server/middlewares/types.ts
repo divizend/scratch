@@ -3,7 +3,7 @@
  */
 
 import { IncomingMessage, ServerResponse } from "node:http";
-import { ScratchContext } from "../../core/index";
+import { ScratchContext } from "../../index";
 
 export interface MiddlewareContext {
   req: IncomingMessage | any;
